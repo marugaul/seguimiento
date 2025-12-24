@@ -8,14 +8,69 @@ class DashboardManager {
             lider: '',
             pais: '',
             estado: '',
-            etapa: ''
+            etapa: '',
+            tipo: '',           // LOCAL o REGIONAL
+            categoria: ''       // PROYECTO, SOPORTE, REQUERIMIENTO
         };
     }
 
     loadProjects() {
         this.projects = storageManager.getProjects();
+        this.enrichProjects(); // Agregar campos calculados
         this.applyFilters();
         return this.projects;
+    }
+
+    enrichProjects() {
+        this.projects.forEach(project => {
+            // Determinar categoría basándose en TIPO PROYECTO
+            if (project.tipoProyecto.toUpperCase().includes('IMPLEMENTACIÓN') ||
+                project.tipoProyecto.toUpperCase().includes('IMPLEMENTACION')) {
+                project.categoria = 'PROYECTO';
+                project.numero = project.iniciativa;
+            } else if (project.tipoProyecto.toUpperCase().includes('SOPORTE')) {
+                project.categoria = 'SOPORTE';
+                project.numero = project.casoFs;
+            } else if (project.tipoProyecto.toUpperCase().includes('REQUERIMIENTO')) {
+                project.categoria = 'REQUERIMIENTO';
+                project.numero = project.casoFs;
+            } else {
+                project.categoria = 'OTRO';
+                project.numero = project.casoFs || project.iniciativa;
+            }
+
+            // Validar presupuesto: (Estimación + Control Cambio) vs (Total Registrado + Total Disponible)
+            const presupuestoTotal = project.estimacion + project.controlCambio;
+            const consumoTotal = project.totalRegistrado + project.totalDisponible;
+
+            if (presupuestoTotal > consumoTotal) {
+                project.alertaPresupuesto = 'CRITICO'; // Rojo
+            } else if (presupuestoTotal === consumoTotal) {
+                project.alertaPresupuesto = 'OK'; // Verde
+            } else {
+                project.alertaPresupuesto = 'ADVERTENCIA'; // Amarillo - hay más presupuesto del necesario
+            }
+
+            // Calcular desviación absoluta
+            project.desviacionAbsoluta = Math.abs(project.desvHoras);
+
+            // Parsear porcentajes para comparación
+            project.avanceRealNumerico = this.parsePercentage(project.porcentajeAvanceReal);
+            project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
+            project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
+
+            // Determinar si está desviado (más de 10% de diferencia)
+            const desviacionAvance = project.avanceEsperadoNumerico - project.avanceRealNumerico;
+            project.estadoDesviacion = desviacionAvance > 10 ? 'RETRASADO' :
+                                      desviacionAvance < -10 ? 'ADELANTADO' : 'EN_TIEMPO';
+        });
+    }
+
+    parsePercentage(percentStr) {
+        if (!percentStr) return 0;
+        const cleaned = String(percentStr).replace('%', '').trim();
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
     }
 
     applyFilters() {
@@ -24,6 +79,8 @@ class DashboardManager {
             if (this.filters.pais && project.pais !== this.filters.pais) return false;
             if (this.filters.estado && project.estado !== this.filters.estado) return false;
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
+            if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
+            if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
             return true;
         });
     }
@@ -35,7 +92,7 @@ class DashboardManager {
     }
 
     clearFilters() {
-        this.filters = { lider: '', pais: '', estado: '', etapa: '' };
+        this.filters = { lider: '', pais: '', estado: '', etapa: '', tipo: '', categoria: '' };
         this.applyFilters();
         this.render();
     }
@@ -47,11 +104,34 @@ class DashboardManager {
 
     getStats() {
         const projects = this.filteredProjects;
+
+        // Contar por categoría
+        const proyectos = projects.filter(p => p.categoria === 'PROYECTO').length;
+        const soportes = projects.filter(p => p.categoria === 'SOPORTE').length;
+        const requerimientos = projects.filter(p => p.categoria === 'REQUERIMIENTO').length;
+
+        // Contar alertas de presupuesto
+        const alertasCriticas = projects.filter(p => p.alertaPresupuesto === 'CRITICO').length;
+
+        // Contar desviaciones
+        const retrasados = projects.filter(p => p.estadoDesviacion === 'RETRASADO').length;
+        const adelantados = projects.filter(p => p.estadoDesviacion === 'ADELANTADO').length;
+
         return {
             totalProjects: projects.length,
+            totalProyectos: proyectos,
+            totalSoportes: soportes,
+            totalRequerimientos: requerimientos,
             totalHorasEstimadas: projects.reduce((sum, p) => sum + p.totalEstimacion, 0),
             totalHorasRegistradas: projects.reduce((sum, p) => sum + p.totalRegistrado, 0),
-            totalLideres: new Set(projects.map(p => p.nombreLt)).size
+            totalLideres: new Set(projects.map(p => p.nombreLt)).size,
+            alertasCriticas: alertasCriticas,
+            retrasados: retrasados,
+            adelantados: adelantados,
+            promedioAvanceReal: projects.length > 0 ?
+                projects.reduce((sum, p) => sum + p.avanceRealNumerico, 0) / projects.length : 0,
+            promedioAvanceEsperado: projects.length > 0 ?
+                projects.reduce((sum, p) => sum + p.avanceEsperadoNumerico, 0) / projects.length : 0
         };
     }
 
@@ -68,6 +148,7 @@ class DashboardManager {
         const paises = this.getUniqueValues('pais');
         const estados = this.getUniqueValues('estado');
         const etapas = this.getUniqueValues('etapa');
+        const tipos = this.getUniqueValues('tipo');
 
         return `
             <div class="row mb-4">
@@ -81,37 +162,81 @@ class DashboardManager {
                 </div>
             </div>
 
-            <!-- Tarjetas de resumen -->
+            <!-- Tarjetas de resumen principales -->
             <div class="row mb-4">
                 <div class="col-md-3">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
-                            <h6><i class="bi bi-folder"></i> Total Proyectos</h6>
+                            <h6><i class="bi bi-folder"></i> Total General</h6>
                             <h2>${stats.totalProjects}</h2>
+                            <small>Proyectos, Soportes y Requerimientos</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card bg-success text-white">
                         <div class="card-body">
-                            <h6><i class="bi bi-clock-history"></i> Horas Estimadas</h6>
-                            <h2>${stats.totalHorasEstimadas.toLocaleString('es')}</h2>
+                            <h6><i class="bi bi-diagram-3"></i> Proyectos</h6>
+                            <h2>${stats.totalProyectos}</h2>
+                            <small>Implementaciones</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card bg-info text-white">
                         <div class="card-body">
-                            <h6><i class="bi bi-check-circle"></i> Horas Registradas</h6>
-                            <h2>${stats.totalHorasRegistradas.toLocaleString('es')}</h2>
+                            <h6><i class="bi bi-tools"></i> Soportes</h6>
+                            <h2>${stats.totalSoportes}</h2>
+                            <small>Casos de soporte</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card bg-warning text-white">
                         <div class="card-body">
-                            <h6><i class="bi bi-people"></i> Líderes Técnicos</h6>
-                            <h2>${stats.totalLideres}</h2>
+                            <h6><i class="bi bi-clipboard-check"></i> Requerimientos</h6>
+                            <h2>${stats.totalRequerimientos}</h2>
+                            <small>Solicitudes</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjetas de alertas y métricas -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white">
+                        <div class="card-body">
+                            <h6><i class="bi bi-exclamation-triangle"></i> Alertas Presupuesto</h6>
+                            <h2>${stats.alertasCriticas}</h2>
+                            <small>Proyectos con presupuesto excedido</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h6><i class="bi bi-arrow-down-circle"></i> Retrasados</h6>
+                            <h2>${stats.retrasados}</h2>
+                            <small>Con desviación negativa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h6><i class="bi bi-percent"></i> Avance Real</h6>
+                            <h2>${stats.promedioAvanceReal.toFixed(1)}%</h2>
+                            <small>Promedio general</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <h6><i class="bi bi-graph-up"></i> Avance Esperado</h6>
+                            <h2>${stats.promedioAvanceEsperado.toFixed(1)}%</h2>
+                            <small>Promedio planificado</small>
                         </div>
                     </div>
                 </div>
@@ -124,28 +249,44 @@ class DashboardManager {
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Tipo</label>
+                            <select id="filterTipo" class="form-select" onchange="dashboardManager.setFilter('tipo', this.value)">
+                                <option value="">Todos</option>
+                                ${tipos.map(t => `<option value="${t}" ${this.filters.tipo === t ? 'selected' : ''}>${t}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Categoría</label>
+                            <select id="filterCategoria" class="form-select" onchange="dashboardManager.setFilter('categoria', this.value)">
+                                <option value="">Todos</option>
+                                <option value="PROYECTO" ${this.filters.categoria === 'PROYECTO' ? 'selected' : ''}>Proyectos</option>
+                                <option value="SOPORTE" ${this.filters.categoria === 'SOPORTE' ? 'selected' : ''}>Soportes</option>
+                                <option value="REQUERIMIENTO" ${this.filters.categoria === 'REQUERIMIENTO' ? 'selected' : ''}>Requerimientos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label">Líder Técnico</label>
                             <select id="filterLider" class="form-select" onchange="dashboardManager.setFilter('lider', this.value)">
                                 <option value="">Todos</option>
                                 ${lideres.map(l => `<option value="${l}" ${this.filters.lider === l ? 'selected' : ''}>${l}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">País</label>
                             <select id="filterPais" class="form-select" onchange="dashboardManager.setFilter('pais', this.value)">
                                 <option value="">Todos</option>
                                 ${paises.map(p => `<option value="${p}" ${this.filters.pais === p ? 'selected' : ''}>${p}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Estado</label>
                             <select id="filterEstado" class="form-select" onchange="dashboardManager.setFilter('estado', this.value)">
                                 <option value="">Todos</option>
                                 ${estados.map(e => `<option value="${e}" ${this.filters.estado === e ? 'selected' : ''}>${e}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Etapa</label>
                             <select id="filterEtapa" class="form-select" onchange="dashboardManager.setFilter('etapa', this.value)">
                                 <option value="">Todas</option>
@@ -163,7 +304,77 @@ class DashboardManager {
                 </div>
             </div>
 
-            <!-- Gráficos -->
+            <!-- Gráficos de análisis -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Proyectos por Tipo (Local/Regional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartTipo" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Por Categoría (Proyecto/Soporte/Req.)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartCategoria" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="mb-0"><i class="bi bi-exclamation-octagon"></i> Top 10 Proyectos con Mayor Desviación</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartDesviacion" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0"><i class="bi bi-shield-exclamation"></i> Alertas de Presupuesto</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartPresupuesto" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Avance Real vs Esperado</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartAvance" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Estado de Desviación</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartEstadoDesviacion" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos originales -->
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card">
@@ -178,71 +389,39 @@ class DashboardManager {
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0">Proyectos por Etapa</h6>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="chartEtapa" height="250"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header bg-light">
                             <h6 class="mb-0">Horas por Mes (2025)</h6>
                         </div>
                         <div class="card-body">
-                            <canvas id="chartMeses" height="100"></canvas>
+                            <canvas id="chartMeses" height="250"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Top 10 Líderes por Proyectos</h6>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="chartLideres" height="250"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Proyectos por País</h6>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="chartPaises" height="250"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tabla de proyectos -->
+            <!-- Tabla de proyectos mejorada -->
             <div class="card">
                 <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} proyectos)</h5>
+                    <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-striped table-hover table-sm">
                             <thead class="table-dark">
                                 <tr>
+                                    <th>Tipo</th>
+                                    <th>Categoría</th>
+                                    <th>Número</th>
                                     <th>Líder Técnico</th>
                                     <th>País</th>
-                                    <th>Proyecto FS</th>
                                     <th>Nombre</th>
                                     <th>Estado</th>
-                                    <th>Etapa</th>
-                                    <th class="text-end">Horas Est.</th>
-                                    <th class="text-end">Horas Reg.</th>
-                                    <th class="text-end">% Avance</th>
-                                    <th>Comentarios</th>
+                                    <th class="text-end">Hrs Est.</th>
+                                    <th class="text-end">Hrs Reg.</th>
+                                    <th class="text-end">Desv. Hrs</th>
+                                    <th class="text-end">% Desv.</th>
+                                    <th class="text-end">% Real</th>
+                                    <th class="text-end">% Esperado</th>
+                                    <th class="text-center">Alerta</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -259,21 +438,31 @@ class DashboardManager {
         const estadoBadgeClass = project.estado === 'EN PROCESO' ? 'bg-primary' :
             project.estado === 'REACTIVADO CLIENTE' ? 'bg-warning' : 'bg-secondary';
 
-        const comentarios = project.comentarios.length > 50 ?
-            project.comentarios.substring(0, 50) + '...' : project.comentarios;
+        const categoriaBadge = project.categoria === 'PROYECTO' ? 'bg-success' :
+                              project.categoria === 'SOPORTE' ? 'bg-info' : 'bg-warning';
+
+        const alertaSemaforo = project.alertaPresupuesto === 'CRITICO' ? '🔴' :
+                              project.alertaPresupuesto === 'OK' ? '🟢' : '🟡';
+
+        const desviacionColor = project.desvHoras < 0 ? 'text-success' :
+                               project.desvHoras > 0 ? 'text-danger' : '';
 
         return `
             <tr>
+                <td><span class="badge bg-secondary">${project.tipo}</span></td>
+                <td><span class="badge ${categoriaBadge}">${project.categoria}</span></td>
+                <td><small>${project.numero}</small></td>
                 <td><strong>${project.nombreLt}</strong></td>
-                <td><span class="badge bg-secondary">${project.pais}</span></td>
-                <td>${project.proyectoFs}</td>
-                <td>${project.nombre}</td>
+                <td>${project.pais}</td>
+                <td><small>${project.nombre.substring(0, 40)}${project.nombre.length > 40 ? '...' : ''}</small></td>
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
-                <td><small>${project.etapa}</small></td>
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
-                <td class="text-end">${project.porcentajeAvanceHoras}</td>
-                <td><small>${comentarios}</small></td>
+                <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
+                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}</strong></td>
+                <td class="text-end">${project.porcentajeAvanceReal}</td>
+                <td class="text-end">${project.porcentajeAvanceEsperado}</td>
+                <td class="text-center" title="${project.alertaPresupuesto}">${alertaSemaforo}</td>
             </tr>
         `;
     }
@@ -285,15 +474,15 @@ class DashboardManager {
 
         const projects = this.filteredProjects;
 
-        // Proyectos por Estado
-        const estadoData = this.groupBy(projects, 'estado');
-        this.charts.estado = new Chart(document.getElementById('chartEstado'), {
+        // Gráfico por Tipo (Local/Regional)
+        const tipoData = this.groupBy(projects, 'tipo');
+        this.charts.tipo = new Chart(document.getElementById('chartTipo'), {
             type: 'doughnut',
             data: {
-                labels: Object.keys(estadoData),
+                labels: Object.keys(tipoData),
                 datasets: [{
-                    data: Object.values(estadoData),
-                    backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#0dcaf0']
+                    data: Object.values(tipoData),
+                    backgroundColor: ['#0d6efd', '#198754']
                 }]
             },
             options: {
@@ -303,15 +492,134 @@ class DashboardManager {
             }
         });
 
-        // Proyectos por Etapa
-        const etapaData = this.groupBy(projects, 'etapa');
-        this.charts.etapa = new Chart(document.getElementById('chartEtapa'), {
+        // Gráfico por Categoría
+        const categoriaData = this.groupBy(projects, 'categoria');
+        this.charts.categoria = new Chart(document.getElementById('chartCategoria'), {
             type: 'pie',
             data: {
-                labels: Object.keys(etapaData),
+                labels: Object.keys(categoriaData),
                 datasets: [{
-                    data: Object.values(etapaData),
-                    backgroundColor: ['#198754', '#0d6efd', '#ffc107', '#dc3545', '#6c757d', '#0dcaf0']
+                    data: Object.values(categoriaData),
+                    backgroundColor: ['#198754', '#0dcaf0', '#ffc107', '#6c757d']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+
+        // Top 10 Proyectos con Mayor Desviación
+        const topDesviados = projects
+            .sort((a, b) => b.desviacionAbsoluta - a.desviacionAbsoluta)
+            .slice(0, 10);
+
+        this.charts.desviacion = new Chart(document.getElementById('chartDesviacion'), {
+            type: 'bar',
+            data: {
+                labels: topDesviados.map(p => p.nombre.substring(0, 30)),
+                datasets: [{
+                    label: 'Desviación (horas)',
+                    data: topDesviados.map(p => p.desvHoras),
+                    backgroundColor: topDesviados.map(p => p.desvHoras > 0 ? '#dc3545' : '#198754')
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Horas' }
+                    }
+                }
+            }
+        });
+
+        // Alertas de Presupuesto
+        const presupuestoData = this.groupBy(projects, 'alertaPresupuesto');
+        this.charts.presupuesto = new Chart(document.getElementById('chartPresupuesto'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(presupuestoData),
+                datasets: [{
+                    data: Object.values(presupuestoData),
+                    backgroundColor: {
+                        'CRITICO': '#dc3545',
+                        'OK': '#198754',
+                        'ADVERTENCIA': '#ffc107'
+                    }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+
+        // Avance Real vs Esperado
+        const avanceComparacion = {
+            real: projects.reduce((sum, p) => sum + p.avanceRealNumerico, 0) / (projects.length || 1),
+            esperado: projects.reduce((sum, p) => sum + p.avanceEsperadoNumerico, 0) / (projects.length || 1)
+        };
+
+        this.charts.avance = new Chart(document.getElementById('chartAvance'), {
+            type: 'bar',
+            data: {
+                labels: ['Avance Real', 'Avance Esperado'],
+                datasets: [{
+                    label: 'Porcentaje',
+                    data: [avanceComparacion.real, avanceComparacion.esperado],
+                    backgroundColor: ['#0d6efd', '#ffc107']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: '% Avance' }
+                    }
+                }
+            }
+        });
+
+        // Estado de Desviación
+        const desviacionData = this.groupBy(projects, 'estadoDesviacion');
+        this.charts.estadoDesviacion = new Chart(document.getElementById('chartEstadoDesviacion'), {
+            type: 'pie',
+            data: {
+                labels: ['En Tiempo', 'Retrasado', 'Adelantado'],
+                datasets: [{
+                    data: [
+                        desviacionData['EN_TIEMPO'] || 0,
+                        desviacionData['RETRASADO'] || 0,
+                        desviacionData['ADELANTADO'] || 0
+                    ],
+                    backgroundColor: ['#198754', '#dc3545', '#0dcaf0']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+
+        // Proyectos por Estado
+        const estadoData = this.groupBy(projects, 'estado');
+        this.charts.estado = new Chart(document.getElementById('chartEstado'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(estadoData),
+                datasets: [{
+                    data: Object.values(estadoData),
+                    backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#0dcaf0']
                 }]
             },
             options: {
@@ -351,48 +659,6 @@ class DashboardManager {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { y: { beginAtZero: true } }
-            }
-        });
-
-        // Top 10 Líderes
-        const lideresData = this.groupBy(projects, 'nombreLt');
-        const topLideres = Object.entries(lideresData)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
-
-        this.charts.lideres = new Chart(document.getElementById('chartLideres'), {
-            type: 'bar',
-            data: {
-                labels: topLideres.map(l => l[0]),
-                datasets: [{
-                    label: 'Proyectos',
-                    data: topLideres.map(l => l[1]),
-                    backgroundColor: '#198754'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                scales: { x: { beginAtZero: true } }
-            }
-        });
-
-        // Proyectos por País
-        const paisData = this.groupBy(projects, 'pais');
-        this.charts.paises = new Chart(document.getElementById('chartPaises'), {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(paisData),
-                datasets: [{
-                    data: Object.values(paisData),
-                    backgroundColor: ['#ffc107', '#0d6efd', '#198754', '#dc3545', '#6c757d', '#0dcaf0']
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'right' } }
             }
         });
     }
