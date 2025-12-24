@@ -135,6 +135,98 @@ class DashboardManager {
         };
     }
 
+    getMensualData() {
+        const projects = this.filteredProjects;
+        return {
+            'Ene': projects.reduce((sum, p) => sum + p.mes01, 0),
+            'Feb': projects.reduce((sum, p) => sum + p.mes02, 0),
+            'Mar': projects.reduce((sum, p) => sum + p.mes03, 0),
+            'Abr': projects.reduce((sum, p) => sum + p.mes04, 0),
+            'May': projects.reduce((sum, p) => sum + p.mes05, 0),
+            'Jun': projects.reduce((sum, p) => sum + p.mes06, 0),
+            'Jul': projects.reduce((sum, p) => sum + p.mes07, 0),
+            'Ago': projects.reduce((sum, p) => sum + p.mes08, 0),
+            'Sep': projects.reduce((sum, p) => sum + p.mes09, 0),
+            'Oct': projects.reduce((sum, p) => sum + p.mes10, 0),
+            'Nov': projects.reduce((sum, p) => sum + p.mes11, 0),
+            'Dic': projects.reduce((sum, p) => sum + p.mes12, 0)
+        };
+    }
+
+    getComparativaMensual() {
+        const mesesData = this.getMensualData();
+        const meses = Object.keys(mesesData);
+        const valores = Object.values(mesesData);
+
+        const comparativa = {
+            meses: [],
+            variacion: [],
+            variacionPorcentual: []
+        };
+
+        for (let i = 1; i < meses.length; i++) {
+            const mesActual = meses[i];
+            const mesAnterior = meses[i - 1];
+            const valorActual = valores[i];
+            const valorAnterior = valores[i - 1];
+
+            const variacion = valorActual - valorAnterior;
+            const variacionPct = valorAnterior !== 0 ? ((variacion / valorAnterior) * 100) : 0;
+
+            comparativa.meses.push(`${mesAnterior}-${mesActual}`);
+            comparativa.variacion.push(variacion);
+            comparativa.variacionPorcentual.push(variacionPct);
+        }
+
+        return comparativa;
+    }
+
+    getTendenciaPorLider() {
+        const projects = this.filteredProjects;
+        const lideres = [...new Set(projects.map(p => p.nombreLt))].filter(l => l).slice(0, 5); // Top 5 líderes
+
+        const datasets = lideres.map((lider, index) => {
+            const proyectosLider = projects.filter(p => p.nombreLt === lider);
+            const colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d'];
+
+            return {
+                label: lider,
+                data: [
+                    proyectosLider.reduce((sum, p) => sum + p.mes01, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes02, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes03, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes04, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes05, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes06, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes07, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes08, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes09, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes10, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes11, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes12, 0)
+                ],
+                borderColor: colors[index],
+                backgroundColor: colors[index] + '33',
+                tension: 0.4
+            };
+        });
+
+        return datasets;
+    }
+
+    getProyectosActivosPorMes() {
+        const projects = this.filteredProjects;
+        const activos = [];
+
+        for (let mes = 1; mes <= 12; mes++) {
+            const mesKey = `mes${mes.toString().padStart(2, '0')}`;
+            const proyectosActivos = projects.filter(p => p[mesKey] > 0).length;
+            activos.push(proyectosActivos);
+        }
+
+        return activos;
+    }
+
     render() {
         const dashboardHtml = this.generateDashboardHTML();
         document.getElementById('dashboardPage').innerHTML = dashboardHtml;
@@ -304,7 +396,84 @@ class DashboardManager {
                 </div>
             </div>
 
+            <!-- Sección de Tendencias y Comparativas -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h4><i class="bi bi-graph-up"></i> Análisis de Tendencias Mensuales</h4>
+                    <hr>
+                </div>
+            </div>
+
+            <!-- Tendencias Mensuales -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="bi bi-activity"></i> Tendencia de Horas por Mes (Línea de Tiempo)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartTendenciaMensual" height="80"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparativa Mes a Mes -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart-line"></i> Variación de Horas Mes a Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartVariacionMensual" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0"><i class="bi bi-percent"></i> Variación Porcentual Mes a Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartVariacionPorcentual" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tendencias por Líder -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-people-fill"></i> Tendencia por Líder Técnico (Top 5)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartTendenciaLider" height="180"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="bi bi-bookmark-star"></i> Proyectos Activos por Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartProyectosActivos" height="280"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Gráficos de análisis -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h4><i class="bi bi-pie-chart"></i> Distribución y Análisis</h4>
+                    <hr>
+                </div>
+            </div>
+
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card">
@@ -473,6 +642,182 @@ class DashboardManager {
         this.charts = {};
 
         const projects = this.filteredProjects;
+        const mesesData = this.getMensualData();
+        const comparativa = this.getComparativaMensual();
+
+        // === GRÁFICOS DE TENDENCIAS ===
+
+        // 1. Tendencia Mensual (Línea de Tiempo)
+        this.charts.tendenciaMensual = new Chart(document.getElementById('chartTendenciaMensual'), {
+            type: 'line',
+            data: {
+                labels: Object.keys(mesesData),
+                datasets: [{
+                    label: 'Horas Trabajadas',
+                    data: Object.values(mesesData),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    title: {
+                        display: true,
+                        text: 'Evolución de Horas a lo Largo del Año 2025'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Horas' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Meses' }
+                    }
+                }
+            }
+        });
+
+        // 2. Variación de Horas Mes a Mes
+        this.charts.variacionMensual = new Chart(document.getElementById('chartVariacionMensual'), {
+            type: 'bar',
+            data: {
+                labels: comparativa.meses,
+                datasets: [{
+                    label: 'Variación (Horas)',
+                    data: comparativa.variacion,
+                    backgroundColor: comparativa.variacion.map(v => v >= 0 ? '#198754' : '#dc3545'),
+                    borderColor: comparativa.variacion.map(v => v >= 0 ? '#146c43' : '#b02a37'),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Diferencia de Horas entre Meses Consecutivos'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Variación (Horas)' }
+                    }
+                }
+            }
+        });
+
+        // 3. Variación Porcentual Mes a Mes
+        this.charts.variacionPorcentual = new Chart(document.getElementById('chartVariacionPorcentual'), {
+            type: 'line',
+            data: {
+                labels: comparativa.meses,
+                datasets: [{
+                    label: '% de Cambio',
+                    data: comparativa.variacionPorcentual,
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    segment: {
+                        borderColor: ctx => ctx.p0.parsed.y >= 0 ? '#198754' : '#dc3545',
+                        backgroundColor: ctx => ctx.p0.parsed.y >= 0 ? 'rgba(25, 135, 84, 0.1)' : 'rgba(220, 53, 69, 0.1)'
+                    }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Variación entre Meses'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Variación (%)' }
+                    }
+                }
+            }
+        });
+
+        // 4. Tendencia por Líder Técnico (Top 5)
+        const tendenciaLider = this.getTendenciaPorLider();
+        this.charts.tendenciaLider = new Chart(document.getElementById('chartTendenciaLider'), {
+            type: 'line',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: tendenciaLider
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    title: {
+                        display: true,
+                        text: 'Evolución de Horas por Líder Técnico'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Horas' }
+                    }
+                }
+            }
+        });
+
+        // 5. Proyectos Activos por Mes
+        const proyectosActivos = this.getProyectosActivosPorMes();
+        this.charts.proyectosActivos = new Chart(document.getElementById('chartProyectosActivos'), {
+            type: 'bar',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: [{
+                    label: 'Proyectos con Actividad',
+                    data: proyectosActivos,
+                    backgroundColor: '#6c757d',
+                    borderColor: '#495057',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Proyectos con Horas Registradas'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 },
+                        title: { display: true, text: 'Cantidad' }
+                    }
+                }
+            }
+        });
+
+        // === GRÁFICOS DE ANÁLISIS EXISTENTES ===
 
         // Gráfico por Tipo (Local/Regional)
         const tipoData = this.groupBy(projects, 'tipo');
