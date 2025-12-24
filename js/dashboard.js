@@ -43,16 +43,25 @@ class DashboardManager {
                 project.numero = project.casoFs || project.iniciativa;
             }
 
-            // Validar presupuesto: (Estimación + Control Cambio) vs (Total Registrado + Total Disponible)
-            const presupuestoTotal = project.estimacion + project.controlCambio;
-            const consumoTotal = project.totalRegistrado + project.totalDisponible;
+            // Validar presupuesto basado en consumo real vs estimado
+            const presupuestoPlaneado = project.estimacion + project.controlCambio;
+            const horasConsumidas = project.totalRegistrado;
 
-            if (presupuestoTotal > consumoTotal) {
-                project.alertaPresupuesto = 'CRITICO'; // Rojo
-            } else if (presupuestoTotal === consumoTotal) {
-                project.alertaPresupuesto = 'OK'; // Verde
+            // Calcular porcentaje de consumo
+            const porcentajeConsumo = presupuestoPlaneado > 0 ?
+                (horasConsumidas / presupuestoPlaneado) * 100 : 0;
+
+            // Lógica de alertas:
+            // - CRITICO (🔴): Ya se consumieron más horas de las estimadas (o Total Disponible negativo)
+            // - ADVERTENCIA (🟡): Se ha consumido 85% o más del presupuesto (falta 15% o menos)
+            // - OK (🟢): Consumo normal, aún hay margen suficiente
+
+            if (horasConsumidas > presupuestoPlaneado || project.totalDisponible < 0) {
+                project.alertaPresupuesto = 'CRITICO'; // 🔴 Presupuesto excedido
+            } else if (porcentajeConsumo >= 85) {
+                project.alertaPresupuesto = 'ADVERTENCIA'; // 🟡 Falta 15% o menos
             } else {
-                project.alertaPresupuesto = 'ADVERTENCIA'; // Amarillo - hay más presupuesto del necesario
+                project.alertaPresupuesto = 'OK'; // 🟢 Dentro del presupuesto
             }
 
             // Calcular desviación absoluta
