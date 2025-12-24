@@ -975,21 +975,6 @@ class DashboardManager {
         });
 
         // Horas por Mes
-        const mesesData = {
-            'Ene': projects.reduce((sum, p) => sum + p.mes01, 0),
-            'Feb': projects.reduce((sum, p) => sum + p.mes02, 0),
-            'Mar': projects.reduce((sum, p) => sum + p.mes03, 0),
-            'Abr': projects.reduce((sum, p) => sum + p.mes04, 0),
-            'May': projects.reduce((sum, p) => sum + p.mes05, 0),
-            'Jun': projects.reduce((sum, p) => sum + p.mes06, 0),
-            'Jul': projects.reduce((sum, p) => sum + p.mes07, 0),
-            'Ago': projects.reduce((sum, p) => sum + p.mes08, 0),
-            'Sep': projects.reduce((sum, p) => sum + p.mes09, 0),
-            'Oct': projects.reduce((sum, p) => sum + p.mes10, 0),
-            'Nov': projects.reduce((sum, p) => sum + p.mes11, 0),
-            'Dic': projects.reduce((sum, p) => sum + p.mes12, 0)
-        };
-
         this.charts.meses = new Chart(document.getElementById('chartMeses'), {
             type: 'bar',
             data: {
