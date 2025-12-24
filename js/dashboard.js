@@ -14,6 +14,8 @@ class DashboardManager {
             alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
             estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
+        this.sortColumn = '';
+        this.sortDirection = 'asc'; // 'asc' o 'desc'
     }
 
     loadProjects() {
@@ -87,6 +89,46 @@ class DashboardManager {
             if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
         });
+        this.applySorting();
+    }
+
+    applySorting() {
+        if (!this.sortColumn) return;
+
+        this.filteredProjects.sort((a, b) => {
+            let valA = a[this.sortColumn];
+            let valB = b[this.sortColumn];
+
+            // Manejar valores nulos o undefined
+            if (valA === null || valA === undefined) valA = '';
+            if (valB === null || valB === undefined) valB = '';
+
+            // Convertir a números si es posible
+            const numA = parseFloat(valA);
+            const numB = parseFloat(valB);
+
+            let comparison = 0;
+            if (!isNaN(numA) && !isNaN(numB)) {
+                comparison = numA - numB;
+            } else {
+                comparison = String(valA).localeCompare(String(valB));
+            }
+
+            return this.sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    sortBy(column) {
+        if (this.sortColumn === column) {
+            // Cambiar dirección si es la misma columna
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            // Nueva columna, ordenar ascendente
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        this.applySorting();
+        this.render();
     }
 
     setFilter(filterName, value) {
@@ -626,20 +668,20 @@ class DashboardManager {
                         <table class="table table-striped table-hover table-sm">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>Tipo</th>
-                                    <th>Categoría</th>
-                                    <th>Número</th>
-                                    <th>Líder Técnico</th>
-                                    <th>País</th>
-                                    <th>Nombre</th>
-                                    <th>Estado</th>
-                                    <th class="text-end">Hrs Est.</th>
-                                    <th class="text-end">Hrs Reg.</th>
-                                    <th class="text-end">Desv. Hrs</th>
-                                    <th class="text-end">% Desv.</th>
-                                    <th class="text-end">% Real</th>
-                                    <th class="text-end">% Esperado</th>
-                                    <th class="text-center">Alerta</th>
+                                    ${this.generateSortableHeader('tipo', 'Tipo')}
+                                    ${this.generateSortableHeader('categoria', 'Categoría')}
+                                    ${this.generateSortableHeader('numero', 'Número')}
+                                    ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
+                                    ${this.generateSortableHeader('pais', 'País')}
+                                    ${this.generateSortableHeader('nombreProyecto', 'Nombre')}
+                                    ${this.generateSortableHeader('estado', 'Estado')}
+                                    ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
+                                    ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
+                                    ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
+                                    ${this.generateSortableHeader('desvPorcentaje', '% Desv.', 'text-end')}
+                                    ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
+                                    ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
+                                    ${this.generateSortableHeader('alertaPresupuesto', 'Alerta', 'text-center')}
                                 </tr>
                             </thead>
                             <tbody>
@@ -650,6 +692,22 @@ class DashboardManager {
                 </div>
             </div>
         `;
+    }
+
+    generateSortableHeader(column, label, className = '') {
+        const isActive = this.sortColumn === column;
+        const icon = !isActive ? '<i class="bi bi-arrow-down-up ms-1"></i>' :
+                    this.sortDirection === 'asc' ? '<i class="bi bi-arrow-up ms-1"></i>' :
+                    '<i class="bi bi-arrow-down ms-1"></i>';
+
+        const activeClass = isActive ? 'bg-primary' : '';
+
+        return `<th class="${className} ${activeClass}"
+                    onclick="dashboardManager.sortBy('${column}')"
+                    style="cursor: pointer; user-select: none;"
+                    title="Click para ordenar por ${label}">
+                    ${label} ${icon}
+                </th>`;
     }
 
     generateProjectRow(project) {
