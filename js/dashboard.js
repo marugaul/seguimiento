@@ -10,7 +10,9 @@ class DashboardManager {
             estado: '',
             etapa: '',
             tipo: '',           // LOCAL o REGIONAL
-            categoria: ''       // PROYECTO, SOPORTE, REQUERIMIENTO
+            categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
+            alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
+            estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
     }
 
@@ -81,6 +83,8 @@ class DashboardManager {
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
             if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
+            if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
+            if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
         });
     }
@@ -89,10 +93,27 @@ class DashboardManager {
         this.filters[filterName] = value;
         this.applyFilters();
         this.render();
+
+        // Scroll a la tabla de proyectos después de un pequeño delay
+        setTimeout(() => {
+            const tabla = document.getElementById('projectsTable');
+            if (tabla) {
+                tabla.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 300);
     }
 
     clearFilters() {
-        this.filters = { lider: '', pais: '', estado: '', etapa: '', tipo: '', categoria: '' };
+        this.filters = {
+            lider: '',
+            pais: '',
+            estado: '',
+            etapa: '',
+            tipo: '',
+            categoria: '',
+            alertaPresupuesto: '',
+            estadoDesviacion: ''
+        };
         this.applyFilters();
         this.render();
     }
@@ -100,6 +121,28 @@ class DashboardManager {
     getUniqueValues(field) {
         const values = [...new Set(this.projects.map(p => p[field]))];
         return values.filter(v => v).sort();
+    }
+
+    getActiveFiltersHTML() {
+        const badges = [];
+        const filterLabels = {
+            categoria: 'Categoría',
+            alertaPresupuesto: 'Alerta',
+            estadoDesviacion: 'Estado',
+            lider: 'Líder',
+            pais: 'País',
+            estado: 'Estado Proyecto',
+            etapa: 'Etapa',
+            tipo: 'Tipo'
+        };
+
+        for (const [key, value] of Object.entries(this.filters)) {
+            if (value) {
+                badges.push(`<span class="badge bg-primary ms-2">${filterLabels[key]}: ${value}</span>`);
+            }
+        }
+
+        return badges.join('');
     }
 
     getStats() {
@@ -266,29 +309,29 @@ class DashboardManager {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-success text-white" onclick="dashboardManager.setFilter('categoria', 'PROYECTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-diagram-3"></i> Proyectos</h6>
                             <h2>${stats.totalProyectos}</h2>
-                            <small>Implementaciones</small>
+                            <small>Implementaciones (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                    <div class="card bg-info text-white" onclick="dashboardManager.setFilter('categoria', 'SOPORTE')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-tools"></i> Soportes</h6>
                             <h2>${stats.totalSoportes}</h2>
-                            <small>Casos de soporte</small>
+                            <small>Casos de soporte (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card bg-warning text-white" onclick="dashboardManager.setFilter('categoria', 'REQUERIMIENTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-clipboard-check"></i> Requerimientos</h6>
                             <h2>${stats.totalRequerimientos}</h2>
-                            <small>Solicitudes</small>
+                            <small>Solicitudes (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -297,20 +340,20 @@ class DashboardManager {
             <!-- Tarjetas de alertas y métricas -->
             <div class="row mb-4">
                 <div class="col-md-3">
-                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white">
+                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white" onclick="dashboardManager.setFilter('alertaPresupuesto', 'CRITICO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-exclamation-triangle"></i> Alertas Presupuesto</h6>
                             <h2>${stats.alertasCriticas}</h2>
-                            <small>Proyectos con presupuesto excedido</small>
+                            <small>Presupuesto excedido (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-danger text-white">
+                    <div class="card bg-danger text-white" onclick="dashboardManager.setFilter('estadoDesviacion', 'RETRASADO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-arrow-down-circle"></i> Retrasados</h6>
                             <h2>${stats.retrasados}</h2>
-                            <small>Con desviación negativa</small>
+                            <small>Con desviación negativa (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -568,9 +611,15 @@ class DashboardManager {
             </div>
 
             <!-- Tabla de proyectos mejorada -->
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)</h5>
+            <div class="card" id="projectsTable">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
+                        ${this.getActiveFiltersHTML()}
+                    </h5>
+                    ${Object.values(this.filters).some(f => f) ?
+                        '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
+                        : ''}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
