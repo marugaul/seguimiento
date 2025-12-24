@@ -1,0 +1,31 @@
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos temporales
+*.tmp
+*.temp
+*.log
+
+# Node modules (si decides agregar build tools en el futuro)
+node_modules/
+package-lock.json
+
+# Archivos de respaldo
+*.bak
+*.backup
+
+# Archivos de Excel personales (opcional - descomenta si no quieres subir tus Excel)
+# *.xls
+# *.xlsx
+
+# Datos sensibles
+.env
+config.local.js
