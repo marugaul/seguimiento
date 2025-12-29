@@ -26,15 +26,16 @@ class DashboardManager {
     }
 
     enrichProjects() {
-        // DEBUG: Mostrar primeros 3 proyectos para depuración
-        console.log('=== DEBUG: Primeros 3 proyectos ===');
-        this.projects.slice(0, 3).forEach((p, idx) => {
-            console.log(`Proyecto ${idx + 1}:`, {
-                nombre: p.nombreProyecto || p.nombre,
-                tipoProyecto: p.tipoProyecto,
-                tipoProyectoType: typeof p.tipoProyecto
-            });
-        });
+        // DEBUG: Mostrar primeros 5 proyectos en formato tabla
+        console.log('=== DEBUG: Primeros 5 proyectos ===');
+        const debugData = this.projects.slice(0, 5).map((p, idx) => ({
+            '#': idx + 1,
+            'Nombre': (p.nombreProyecto || p.nombre || '').substring(0, 30),
+            'Tipo Proyecto': p.tipoProyecto || '(vacío)',
+            'Tipo (type)': typeof p.tipoProyecto,
+            'Tipo Length': p.tipoProyecto ? String(p.tipoProyecto).length : 0
+        }));
+        console.table(debugData);
 
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
@@ -58,11 +59,7 @@ class DashboardManager {
                 project.numero = project.casoFs || project.iniciativa;
                 // Log solo los primeros 3 OTROS para no saturar la consola
                 if (this.projects.indexOf(project) < 3) {
-                    console.warn('⚠️ Categorizado como OTRO:', {
-                        nombre: project.nombreProyecto || project.nombre,
-                        tipoProyecto: project.tipoProyecto,
-                        tipoNormalizado: tipoNormalizado
-                    });
+                    console.warn(`⚠️ OTRO: "${project.nombreProyecto || project.nombre}" | Tipo: "${project.tipoProyecto}" | Normalizado: "${tipoNormalizado}"`);
                 }
             }
 
