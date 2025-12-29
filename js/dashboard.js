@@ -10,8 +10,12 @@ class DashboardManager {
             estado: '',
             etapa: '',
             tipo: '',           // LOCAL o REGIONAL
-            categoria: ''       // PROYECTO, SOPORTE, REQUERIMIENTO
+            categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
+            alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
+            estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
+        this.sortColumn = '';
+        this.sortDirection = 'asc'; // 'asc' o 'desc'
     }
 
     loadProjects() {
@@ -24,14 +28,19 @@ class DashboardManager {
     enrichProjects() {
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
-            if (project.tipoProyecto.toUpperCase().includes('IMPLEMENTACIÓN') ||
-                project.tipoProyecto.toUpperCase().includes('IMPLEMENTACION')) {
+            // Normalizar el tipo de proyecto (trim, mayúsculas, remover espacios extras)
+            const tipoNormalizado = project.tipoProyecto ?
+                String(project.tipoProyecto).toUpperCase().trim().replace(/\s+/g, ' ') : '';
+
+            if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
+                tipoNormalizado.includes('IMPLEMENTACION') ||
+                tipoNormalizado.includes('PROYECTO')) {
                 project.categoria = 'PROYECTO';
                 project.numero = project.iniciativa;
-            } else if (project.tipoProyecto.toUpperCase().includes('SOPORTE')) {
+            } else if (tipoNormalizado.includes('SOPORTE')) {
                 project.categoria = 'SOPORTE';
                 project.numero = project.casoFs;
-            } else if (project.tipoProyecto.toUpperCase().includes('REQUERIMIENTO')) {
+            } else if (tipoNormalizado.includes('REQUERIMIENTO')) {
                 project.categoria = 'REQUERIMIENTO';
                 project.numero = project.casoFs;
             } else {
@@ -39,16 +48,25 @@ class DashboardManager {
                 project.numero = project.casoFs || project.iniciativa;
             }
 
-            // Validar presupuesto: (Estimación + Control Cambio) vs (Total Registrado + Total Disponible)
-            const presupuestoTotal = project.estimacion + project.controlCambio;
-            const consumoTotal = project.totalRegistrado + project.totalDisponible;
+            // Validar presupuesto basado en consumo real vs estimado
+            const presupuestoPlaneado = project.estimacion + project.controlCambio;
+            const horasConsumidas = project.totalRegistrado;
 
-            if (presupuestoTotal > consumoTotal) {
-                project.alertaPresupuesto = 'CRITICO'; // Rojo
-            } else if (presupuestoTotal === consumoTotal) {
-                project.alertaPresupuesto = 'OK'; // Verde
+            // Calcular porcentaje de consumo
+            const porcentajeConsumo = presupuestoPlaneado > 0 ?
+                (horasConsumidas / presupuestoPlaneado) * 100 : 0;
+
+            // Lógica de alertas:
+            // - CRITICO (🔴): Ya se consumieron más horas de las estimadas (o Total Disponible negativo)
+            // - ADVERTENCIA (🟡): Se ha consumido 85% o más del presupuesto (falta 15% o menos)
+            // - OK (🟢): Consumo normal, aún hay margen suficiente
+
+            if (horasConsumidas > presupuestoPlaneado || project.totalDisponible < 0) {
+                project.alertaPresupuesto = 'CRITICO'; // 🔴 Presupuesto excedido
+            } else if (porcentajeConsumo >= 85) {
+                project.alertaPresupuesto = 'ADVERTENCIA'; // 🟡 Falta 15% o menos
             } else {
-                project.alertaPresupuesto = 'ADVERTENCIA'; // Amarillo - hay más presupuesto del necesario
+                project.alertaPresupuesto = 'OK'; // 🟢 Dentro del presupuesto
             }
 
             // Calcular desviación absoluta
@@ -68,9 +86,24 @@ class DashboardManager {
 
     parsePercentage(percentStr) {
         if (!percentStr) return 0;
-        const cleaned = String(percentStr).replace('%', '').trim();
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : num;
+
+        // Convertir a string y limpiar
+        let cleaned = String(percentStr)
+            .replace('%', '')
+            .replace(',', '.') // Convertir comas a puntos para decimales
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return 0;
+
+        // Si el número está en formato decimal (ej: 0.6 en lugar de 60%), multiplicar por 100
+        if (num > 0 && num < 1) {
+            num = num * 100;
+        }
+
+        return num;
     }
 
     applyFilters() {
@@ -81,18 +114,77 @@ class DashboardManager {
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
             if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
+            if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
+            if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
         });
+        this.applySorting();
+    }
+
+    applySorting() {
+        if (!this.sortColumn) return;
+
+        this.filteredProjects.sort((a, b) => {
+            let valA = a[this.sortColumn];
+            let valB = b[this.sortColumn];
+
+            // Manejar valores nulos o undefined
+            if (valA === null || valA === undefined) valA = '';
+            if (valB === null || valB === undefined) valB = '';
+
+            // Convertir a números si es posible
+            const numA = parseFloat(valA);
+            const numB = parseFloat(valB);
+
+            let comparison = 0;
+            if (!isNaN(numA) && !isNaN(numB)) {
+                comparison = numA - numB;
+            } else {
+                comparison = String(valA).localeCompare(String(valB));
+            }
+
+            return this.sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    sortBy(column) {
+        if (this.sortColumn === column) {
+            // Cambiar dirección si es la misma columna
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            // Nueva columna, ordenar ascendente
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        this.applySorting();
+        this.render();
     }
 
     setFilter(filterName, value) {
         this.filters[filterName] = value;
         this.applyFilters();
         this.render();
+
+        // Scroll a la tabla de proyectos después de un pequeño delay
+        setTimeout(() => {
+            const tabla = document.getElementById('projectsTable');
+            if (tabla) {
+                tabla.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 300);
     }
 
     clearFilters() {
-        this.filters = { lider: '', pais: '', estado: '', etapa: '', tipo: '', categoria: '' };
+        this.filters = {
+            lider: '',
+            pais: '',
+            estado: '',
+            etapa: '',
+            tipo: '',
+            categoria: '',
+            alertaPresupuesto: '',
+            estadoDesviacion: ''
+        };
         this.applyFilters();
         this.render();
     }
@@ -100,6 +192,28 @@ class DashboardManager {
     getUniqueValues(field) {
         const values = [...new Set(this.projects.map(p => p[field]))];
         return values.filter(v => v).sort();
+    }
+
+    getActiveFiltersHTML() {
+        const badges = [];
+        const filterLabels = {
+            categoria: 'Categoría',
+            alertaPresupuesto: 'Alerta',
+            estadoDesviacion: 'Estado',
+            lider: 'Líder',
+            pais: 'País',
+            estado: 'Estado Proyecto',
+            etapa: 'Etapa',
+            tipo: 'Tipo'
+        };
+
+        for (const [key, value] of Object.entries(this.filters)) {
+            if (value) {
+                badges.push(`<span class="badge bg-primary ms-2">${filterLabels[key]}: ${value}</span>`);
+            }
+        }
+
+        return badges.join('');
     }
 
     getStats() {
@@ -133,6 +247,98 @@ class DashboardManager {
             promedioAvanceEsperado: projects.length > 0 ?
                 projects.reduce((sum, p) => sum + p.avanceEsperadoNumerico, 0) / projects.length : 0
         };
+    }
+
+    getMensualData() {
+        const projects = this.filteredProjects;
+        return {
+            'Ene': projects.reduce((sum, p) => sum + p.mes01, 0),
+            'Feb': projects.reduce((sum, p) => sum + p.mes02, 0),
+            'Mar': projects.reduce((sum, p) => sum + p.mes03, 0),
+            'Abr': projects.reduce((sum, p) => sum + p.mes04, 0),
+            'May': projects.reduce((sum, p) => sum + p.mes05, 0),
+            'Jun': projects.reduce((sum, p) => sum + p.mes06, 0),
+            'Jul': projects.reduce((sum, p) => sum + p.mes07, 0),
+            'Ago': projects.reduce((sum, p) => sum + p.mes08, 0),
+            'Sep': projects.reduce((sum, p) => sum + p.mes09, 0),
+            'Oct': projects.reduce((sum, p) => sum + p.mes10, 0),
+            'Nov': projects.reduce((sum, p) => sum + p.mes11, 0),
+            'Dic': projects.reduce((sum, p) => sum + p.mes12, 0)
+        };
+    }
+
+    getComparativaMensual() {
+        const mesesData = this.getMensualData();
+        const meses = Object.keys(mesesData);
+        const valores = Object.values(mesesData);
+
+        const comparativa = {
+            meses: [],
+            variacion: [],
+            variacionPorcentual: []
+        };
+
+        for (let i = 1; i < meses.length; i++) {
+            const mesActual = meses[i];
+            const mesAnterior = meses[i - 1];
+            const valorActual = valores[i];
+            const valorAnterior = valores[i - 1];
+
+            const variacion = valorActual - valorAnterior;
+            const variacionPct = valorAnterior !== 0 ? ((variacion / valorAnterior) * 100) : 0;
+
+            comparativa.meses.push(`${mesAnterior}-${mesActual}`);
+            comparativa.variacion.push(variacion);
+            comparativa.variacionPorcentual.push(variacionPct);
+        }
+
+        return comparativa;
+    }
+
+    getTendenciaPorLider() {
+        const projects = this.filteredProjects;
+        const lideres = [...new Set(projects.map(p => p.nombreLt))].filter(l => l).slice(0, 5); // Top 5 líderes
+
+        const datasets = lideres.map((lider, index) => {
+            const proyectosLider = projects.filter(p => p.nombreLt === lider);
+            const colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d'];
+
+            return {
+                label: lider,
+                data: [
+                    proyectosLider.reduce((sum, p) => sum + p.mes01, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes02, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes03, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes04, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes05, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes06, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes07, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes08, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes09, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes10, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes11, 0),
+                    proyectosLider.reduce((sum, p) => sum + p.mes12, 0)
+                ],
+                borderColor: colors[index],
+                backgroundColor: colors[index] + '33',
+                tension: 0.4
+            };
+        });
+
+        return datasets;
+    }
+
+    getProyectosActivosPorMes() {
+        const projects = this.filteredProjects;
+        const activos = [];
+
+        for (let mes = 1; mes <= 12; mes++) {
+            const mesKey = `mes${mes.toString().padStart(2, '0')}`;
+            const proyectosActivos = projects.filter(p => p[mesKey] > 0).length;
+            activos.push(proyectosActivos);
+        }
+
+        return activos;
     }
 
     render() {
@@ -174,29 +380,29 @@ class DashboardManager {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-success text-white" onclick="dashboardManager.setFilter('categoria', 'PROYECTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-diagram-3"></i> Proyectos</h6>
                             <h2>${stats.totalProyectos}</h2>
-                            <small>Implementaciones</small>
+                            <small>Implementaciones (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                    <div class="card bg-info text-white" onclick="dashboardManager.setFilter('categoria', 'SOPORTE')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-tools"></i> Soportes</h6>
                             <h2>${stats.totalSoportes}</h2>
-                            <small>Casos de soporte</small>
+                            <small>Casos de soporte (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card bg-warning text-white" onclick="dashboardManager.setFilter('categoria', 'REQUERIMIENTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-clipboard-check"></i> Requerimientos</h6>
                             <h2>${stats.totalRequerimientos}</h2>
-                            <small>Solicitudes</small>
+                            <small>Solicitudes (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -205,20 +411,20 @@ class DashboardManager {
             <!-- Tarjetas de alertas y métricas -->
             <div class="row mb-4">
                 <div class="col-md-3">
-                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white">
+                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white" onclick="dashboardManager.setFilter('alertaPresupuesto', 'CRITICO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-exclamation-triangle"></i> Alertas Presupuesto</h6>
                             <h2>${stats.alertasCriticas}</h2>
-                            <small>Proyectos con presupuesto excedido</small>
+                            <small>Presupuesto excedido (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-danger text-white">
+                    <div class="card bg-danger text-white" onclick="dashboardManager.setFilter('estadoDesviacion', 'RETRASADO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-arrow-down-circle"></i> Retrasados</h6>
                             <h2>${stats.retrasados}</h2>
-                            <small>Con desviación negativa</small>
+                            <small>Con desviación negativa (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -304,7 +510,84 @@ class DashboardManager {
                 </div>
             </div>
 
+            <!-- Sección de Tendencias y Comparativas -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h4><i class="bi bi-graph-up"></i> Análisis de Tendencias Mensuales</h4>
+                    <hr>
+                </div>
+            </div>
+
+            <!-- Tendencias Mensuales -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="bi bi-activity"></i> Tendencia de Horas por Mes (Línea de Tiempo)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartTendenciaMensual" height="80"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparativa Mes a Mes -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart-line"></i> Variación de Horas Mes a Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartVariacionMensual" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0"><i class="bi bi-percent"></i> Variación Porcentual Mes a Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartVariacionPorcentual" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tendencias por Líder -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-people-fill"></i> Tendencia por Líder Técnico (Top 5)</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartTendenciaLider" height="180"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="bi bi-bookmark-star"></i> Proyectos Activos por Mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chartProyectosActivos" height="280"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Gráficos de análisis -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h4><i class="bi bi-pie-chart"></i> Distribución y Análisis</h4>
+                    <hr>
+                </div>
+            </div>
+
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card">
@@ -399,29 +682,35 @@ class DashboardManager {
             </div>
 
             <!-- Tabla de proyectos mejorada -->
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)</h5>
+            <div class="card" id="projectsTable">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
+                        ${this.getActiveFiltersHTML()}
+                    </h5>
+                    ${Object.values(this.filters).some(f => f) ?
+                        '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
+                        : ''}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-striped table-hover table-sm">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>Tipo</th>
-                                    <th>Categoría</th>
-                                    <th>Número</th>
-                                    <th>Líder Técnico</th>
-                                    <th>País</th>
-                                    <th>Nombre</th>
-                                    <th>Estado</th>
-                                    <th class="text-end">Hrs Est.</th>
-                                    <th class="text-end">Hrs Reg.</th>
-                                    <th class="text-end">Desv. Hrs</th>
-                                    <th class="text-end">% Desv.</th>
-                                    <th class="text-end">% Real</th>
-                                    <th class="text-end">% Esperado</th>
-                                    <th class="text-center">Alerta</th>
+                                    ${this.generateSortableHeader('tipo', 'Tipo')}
+                                    ${this.generateSortableHeader('categoria', 'Categoría')}
+                                    ${this.generateSortableHeader('numero', 'Número')}
+                                    ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
+                                    ${this.generateSortableHeader('pais', 'País')}
+                                    ${this.generateSortableHeader('nombreProyecto', 'Nombre')}
+                                    ${this.generateSortableHeader('estado', 'Estado')}
+                                    ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
+                                    ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
+                                    ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
+                                    ${this.generateSortableHeader('desvPorcentaje', '% Desv.', 'text-end')}
+                                    ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
+                                    ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
+                                    ${this.generateSortableHeader('alertaPresupuesto', 'Alerta', 'text-center')}
                                 </tr>
                             </thead>
                             <tbody>
@@ -432,6 +721,22 @@ class DashboardManager {
                 </div>
             </div>
         `;
+    }
+
+    generateSortableHeader(column, label, className = '') {
+        const isActive = this.sortColumn === column;
+        const icon = !isActive ? '<i class="bi bi-arrow-down-up ms-1"></i>' :
+                    this.sortDirection === 'asc' ? '<i class="bi bi-arrow-up ms-1"></i>' :
+                    '<i class="bi bi-arrow-down ms-1"></i>';
+
+        const activeClass = isActive ? 'bg-primary' : '';
+
+        return `<th class="${className} ${activeClass}"
+                    onclick="dashboardManager.sortBy('${column}')"
+                    style="cursor: pointer; user-select: none;"
+                    title="Click para ordenar por ${label}">
+                    ${label} ${icon}
+                </th>`;
     }
 
     generateProjectRow(project) {
@@ -473,6 +778,182 @@ class DashboardManager {
         this.charts = {};
 
         const projects = this.filteredProjects;
+        const mesesData = this.getMensualData();
+        const comparativa = this.getComparativaMensual();
+
+        // === GRÁFICOS DE TENDENCIAS ===
+
+        // 1. Tendencia Mensual (Línea de Tiempo)
+        this.charts.tendenciaMensual = new Chart(document.getElementById('chartTendenciaMensual'), {
+            type: 'line',
+            data: {
+                labels: Object.keys(mesesData),
+                datasets: [{
+                    label: 'Horas Trabajadas',
+                    data: Object.values(mesesData),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    title: {
+                        display: true,
+                        text: 'Evolución de Horas a lo Largo del Año 2025'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Horas' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Meses' }
+                    }
+                }
+            }
+        });
+
+        // 2. Variación de Horas Mes a Mes
+        this.charts.variacionMensual = new Chart(document.getElementById('chartVariacionMensual'), {
+            type: 'bar',
+            data: {
+                labels: comparativa.meses,
+                datasets: [{
+                    label: 'Variación (Horas)',
+                    data: comparativa.variacion,
+                    backgroundColor: comparativa.variacion.map(v => v >= 0 ? '#198754' : '#dc3545'),
+                    borderColor: comparativa.variacion.map(v => v >= 0 ? '#146c43' : '#b02a37'),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Diferencia de Horas entre Meses Consecutivos'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Variación (Horas)' }
+                    }
+                }
+            }
+        });
+
+        // 3. Variación Porcentual Mes a Mes
+        this.charts.variacionPorcentual = new Chart(document.getElementById('chartVariacionPorcentual'), {
+            type: 'line',
+            data: {
+                labels: comparativa.meses,
+                datasets: [{
+                    label: '% de Cambio',
+                    data: comparativa.variacionPorcentual,
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    segment: {
+                        borderColor: ctx => ctx.p0.parsed.y >= 0 ? '#198754' : '#dc3545',
+                        backgroundColor: ctx => ctx.p0.parsed.y >= 0 ? 'rgba(25, 135, 84, 0.1)' : 'rgba(220, 53, 69, 0.1)'
+                    }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Variación entre Meses'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Variación (%)' }
+                    }
+                }
+            }
+        });
+
+        // 4. Tendencia por Líder Técnico (Top 5)
+        const tendenciaLider = this.getTendenciaPorLider();
+        this.charts.tendenciaLider = new Chart(document.getElementById('chartTendenciaLider'), {
+            type: 'line',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: tendenciaLider
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    title: {
+                        display: true,
+                        text: 'Evolución de Horas por Líder Técnico'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Horas' }
+                    }
+                }
+            }
+        });
+
+        // 5. Proyectos Activos por Mes
+        const proyectosActivos = this.getProyectosActivosPorMes();
+        this.charts.proyectosActivos = new Chart(document.getElementById('chartProyectosActivos'), {
+            type: 'bar',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: [{
+                    label: 'Proyectos con Actividad',
+                    data: proyectosActivos,
+                    backgroundColor: '#6c757d',
+                    borderColor: '#495057',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Proyectos con Horas Registradas'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 },
+                        title: { display: true, text: 'Cantidad' }
+                    }
+                }
+            }
+        });
+
+        // === GRÁFICOS DE ANÁLISIS EXISTENTES ===
 
         // Gráfico por Tipo (Local/Regional)
         const tipoData = this.groupBy(projects, 'tipo');
@@ -630,21 +1111,6 @@ class DashboardManager {
         });
 
         // Horas por Mes
-        const mesesData = {
-            'Ene': projects.reduce((sum, p) => sum + p.mes01, 0),
-            'Feb': projects.reduce((sum, p) => sum + p.mes02, 0),
-            'Mar': projects.reduce((sum, p) => sum + p.mes03, 0),
-            'Abr': projects.reduce((sum, p) => sum + p.mes04, 0),
-            'May': projects.reduce((sum, p) => sum + p.mes05, 0),
-            'Jun': projects.reduce((sum, p) => sum + p.mes06, 0),
-            'Jul': projects.reduce((sum, p) => sum + p.mes07, 0),
-            'Ago': projects.reduce((sum, p) => sum + p.mes08, 0),
-            'Sep': projects.reduce((sum, p) => sum + p.mes09, 0),
-            'Oct': projects.reduce((sum, p) => sum + p.mes10, 0),
-            'Nov': projects.reduce((sum, p) => sum + p.mes11, 0),
-            'Dic': projects.reduce((sum, p) => sum + p.mes12, 0)
-        };
-
         this.charts.meses = new Chart(document.getElementById('chartMeses'), {
             type: 'bar',
             data: {
