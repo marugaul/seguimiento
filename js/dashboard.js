@@ -26,11 +26,28 @@ class DashboardManager {
     }
 
     enrichProjects() {
+        // DEBUG: Mostrar primeros 5 proyectos en formato tabla
+        console.log('=== DEBUG: Primeros 5 proyectos ===');
+        const debugData = this.projects.slice(0, 5).map((p, idx) => ({
+            '#': idx + 1,
+            'Nombre': (p.nombreProyecto || p.nombre || '').substring(0, 30),
+            'Tipo Proyecto': p.tipoProyecto || '(vacío)',
+            'Tipo (type)': typeof p.tipoProyecto,
+            'Tipo Length': p.tipoProyecto ? String(p.tipoProyecto).length : 0
+        }));
+        console.table(debugData);
+
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
-            // Normalizar el tipo de proyecto (trim, mayúsculas, remover espacios extras)
-            const tipoNormalizado = project.tipoProyecto ?
-                String(project.tipoProyecto).toUpperCase().trim().replace(/\s+/g, ' ') : '';
+            // Decodificar HTML entities y normalizar
+            let tipoNormalizado = '';
+            if (project.tipoProyecto) {
+                // Decodificar HTML entities (ej: &Oacute; → Ó)
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = project.tipoProyecto;
+                tipoNormalizado = (tempDiv.textContent || tempDiv.innerText || '')
+                    .toUpperCase().trim().replace(/\s+/g, ' ');
+            }
 
             if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
                 tipoNormalizado.includes('IMPLEMENTACION') ||
@@ -46,6 +63,10 @@ class DashboardManager {
             } else {
                 project.categoria = 'OTRO';
                 project.numero = project.casoFs || project.iniciativa;
+                // Log solo los primeros 3 OTROS para no saturar la consola
+                if (this.projects.indexOf(project) < 3) {
+                    console.warn(`⚠️ OTRO: "${project.nombreProyecto || project.nombre}" | Tipo: "${project.tipoProyecto}" | Normalizado: "${tipoNormalizado}"`);
+                }
             }
 
             // Validar presupuesto basado en consumo real vs estimado
@@ -81,6 +102,37 @@ class DashboardManager {
             const desviacionAvance = project.avanceEsperadoNumerico - project.avanceRealNumerico;
             project.estadoDesviacion = desviacionAvance > 10 ? 'RETRASADO' :
                                       desviacionAvance < -10 ? 'ADELANTADO' : 'EN_TIEMPO';
+
+            // DEBUG: Log primeros 3 proyectos con porcentajes
+            if (this.projects.indexOf(project) < 3) {
+                console.log(`📊 Proyecto ${this.projects.indexOf(project) + 1}:`, {
+                    nombre: (project.nombreProyecto || project.nombre || '').substring(0, 40),
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
+
+            // DEBUG: Buscar proyectos específicos por INICIATIVA, PROYECTO FS o NOMBRE
+            const nombreCompleto = project.nombreProyecto || project.nombre || '';
+            if ((project.iniciativa && project.iniciativa.includes('INCRC-359')) ||
+                (project.proyectoFs && project.proyectoFs.includes('MOP-PCRC-IMP001')) ||
+                nombreCompleto.includes('INCRC-359-2024')) {
+                console.warn('🔍 ENCONTRADO PROYECTO:', {
+                    iniciativa: project.iniciativa,
+                    proyectoFs: project.proyectoFs,
+                    nombre: nombreCompleto.substring(0, 50),
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
         });
     }
 
@@ -98,12 +150,35 @@ class DashboardManager {
         // Si es NaN, retornar 0
         if (isNaN(num)) return 0;
 
-        // Si el número está en formato decimal (ej: 0.6 en lugar de 60%), multiplicar por 100
-        if (num > 0 && num < 1) {
+        // Si el número está en formato decimal (ej: 0.6 = 60%, 1 = 100%), multiplicar por 100
+        if (num >= 0 && num <= 1) {
             num = num * 100;
         }
 
         return num;
+    }
+
+    formatPercentage(value) {
+        if (!value && value !== 0) return '0';
+
+        // Convertir a string y limpiar
+        let cleaned = String(value)
+            .replace('%', '')
+            .replace(',', '.')
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return '0';
+
+        // Si el número está en formato decimal (ej: 0.5 = 50%, 0.76 = 76%), multiplicar por 100
+        if (num > -1 && num < 1 && num !== 0) {
+            num = num * 100;
+        }
+
+        // Redondear a 2 decimales
+        return num.toFixed(2);
     }
 
     applyFilters() {
@@ -710,7 +785,9 @@ class DashboardManager {
                                     ${this.generateSortableHeader('desvPorcentaje', '% Desv.', 'text-end')}
                                     ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
                                     ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
-                                    ${this.generateSortableHeader('alertaPresupuesto', 'Alerta', 'text-center')}
+                                    ${this.generateSortableHeader('estadoDesviacion', '¿Atrasado?', 'text-center')}
+                                    ${this.generateSortableHeader('alertaPresupuesto', '¿Fuera Presup.?', 'text-center')}
+                                    <th class="text-center">Comentarios</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -752,6 +829,13 @@ class DashboardManager {
         const desviacionColor = project.desvHoras < 0 ? 'text-success' :
                                project.desvHoras > 0 ? 'text-danger' : '';
 
+        // Indicadores Sí/No
+        const esAtrasado = project.estadoDesviacion === 'RETRASADO';
+        const atrasadoBadge = esAtrasado ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
+        const fueraPresupuesto = project.alertaPresupuesto === 'CRITICO';
+        const presupuestoBadge = fueraPresupuesto ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
         return `
             <tr>
                 <td><span class="badge bg-secondary">${project.tipo}</span></td>
@@ -764,10 +848,12 @@ class DashboardManager {
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
-                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}</strong></td>
-                <td class="text-end">${project.porcentajeAvanceReal}</td>
-                <td class="text-end">${project.porcentajeAvanceEsperado}</td>
-                <td class="text-center" title="${project.alertaPresupuesto}">${alertaSemaforo}</td>
+                <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
+                <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
+                <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
+                <td class="text-center">${atrasadoBadge}</td>
+                <td class="text-center">${presupuestoBadge}</td>
+                <td class="text-center"><small>${project.comentarios || '-'}</small></td>
             </tr>
         `;
     }

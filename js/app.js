@@ -51,7 +51,8 @@ function showLogin() {
 function showApp() {
     document.getElementById('loginScreen').classList.add('d-none');
     document.getElementById('appScreen').classList.remove('d-none');
-    document.getElementById('currentUser').textContent = authManager.getCurrentUser();
+    const user = authManager.getCurrentUser();
+    document.getElementById('currentUser').textContent = user.name || user.email || user;
 }
 
 function showPage(pageName) {
@@ -234,112 +235,196 @@ async function handleFileSelect(event) {
 }
 
 function renderManageAccessPage() {
-    const users = authManager.getAuthorizedUsers();
-    const masterPassword = authManager.getMasterPassword();
+    // Verificar si el usuario es admin
+    if (!authManager.isAdmin()) {
+        const noAccessHtml = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Acceso Denegado:</strong> Solo los administradores pueden gestionar usuarios.
+            </div>
+        `;
+        document.getElementById('manageAccessPage').innerHTML = noAccessHtml;
+        return;
+    }
+
+    const users = authManager.getAllUsers();
+    const currentUser = authManager.getCurrentUser();
 
     const manageAccessHtml = `
         <div class="row">
-            <div class="col-md-8">
+            <div class="col-md-12">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0"><i class="bi bi-people"></i> Gestión de Accesos</h4>
+                        <h4 class="mb-0"><i class="bi bi-people"></i> Gestión de Usuarios</h4>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>Importante:</strong> Solo los correos electrónicos autorizados en esta lista
-                            podrán acceder al sistema usando la contraseña maestra.
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Información:</strong> Desde aquí puedes crear usuarios con sus propias contraseñas,
+                            editar sus datos y gestionar el acceso al sistema.
                         </div>
 
-                        <!-- Formulario para agregar email -->
+                        <!-- Formulario para crear usuario -->
                         <div class="card mb-4">
-                            <div class="card-header bg-light">
-                                <h6 class="mb-0">Agregar Nuevo Usuario</h6>
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-person-plus"></i> Crear Nuevo Usuario</h5>
                             </div>
                             <div class="card-body">
-                                <form id="addUserForm" onsubmit="handleAddUser(event)">
-                                    <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="bi bi-envelope"></i>
-                                        </span>
-                                        <input type="email" class="form-control" id="newUserEmail"
-                                               placeholder="usuario@ejemplo.com" required />
+                                <form id="createUserForm" onsubmit="handleCreateUser(event)">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-envelope"></i> Correo Electrónico
+                                            </label>
+                                            <input type="email" class="form-control" id="newUserEmail"
+                                                   placeholder="usuario@ejemplo.com" required />
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-person"></i> Nombre Completo
+                                            </label>
+                                            <input type="text" class="form-control" id="newUserName"
+                                                   placeholder="Nombre del usuario" required />
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-key"></i> Contraseña
+                                            </label>
+                                            <input type="text" class="form-control" id="newUserPassword"
+                                                   placeholder="Contraseña del usuario" required
+                                                   minlength="6" />
+                                            <div class="form-text">Mínimo 6 caracteres</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-shield"></i> Rol
+                                            </label>
+                                            <select class="form-select" id="newUserRole">
+                                                <option value="user">Usuario</option>
+                                                <option value="admin">Administrador</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="d-grid">
                                         <button type="submit" class="btn btn-success">
-                                            <i class="bi bi-plus-circle"></i> Agregar
+                                            <i class="bi bi-plus-circle"></i> Crear Usuario
                                         </button>
                                     </div>
                                 </form>
                             </div>
                         </div>
 
-                        <!-- Lista de usuarios autorizados -->
+                        <!-- Lista de usuarios -->
                         <div class="card">
                             <div class="card-header bg-light">
-                                <h6 class="mb-0">Usuarios Autorizados (${users.length})</h6>
+                                <h5 class="mb-0"><i class="bi bi-list"></i> Usuarios del Sistema (${users.length})</h5>
                             </div>
                             <div class="card-body">
-                                ${users.length === 0 ? `
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i>
-                                        No hay usuarios autorizados actualmente.
-                                    </div>
-                                ` : `
-                                    <div class="list-group">
-                                        ${users.map(email => `
-                                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <i class="bi bi-person-check text-success"></i>
-                                                    <strong>${email}</strong>
-                                                </div>
-                                                <button class="btn btn-danger btn-sm" onclick="handleRemoveUser('${email}')">
-                                                    <i class="bi bi-trash"></i> Eliminar
-                                                </button>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                `}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th><i class="bi bi-envelope"></i> Email</th>
+                                                <th><i class="bi bi-person"></i> Nombre</th>
+                                                <th><i class="bi bi-shield"></i> Rol</th>
+                                                <th><i class="bi bi-key"></i> Contraseña</th>
+                                                <th><i class="bi bi-calendar"></i> Creado</th>
+                                                <th class="text-center"><i class="bi bi-gear"></i> Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${users.map(user => `
+                                                <tr>
+                                                    <td>
+                                                        <strong>${user.email}</strong>
+                                                        ${user.email === currentUser.email ? '<span class="badge bg-primary ms-2">Tú</span>' : ''}
+                                                    </td>
+                                                    <td>${user.name}</td>
+                                                    <td>
+                                                        <span class="badge ${user.role === 'admin' ? 'bg-danger' : 'bg-info'}">
+                                                            ${user.role === 'admin' ? 'Admin' : 'Usuario'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <code class="text-muted">${user.password}</code>
+                                                        <button class="btn btn-sm btn-outline-secondary ms-2"
+                                                                onclick="copyToClipboard('${user.password}')"
+                                                                title="Copiar contraseña">
+                                                            <i class="bi bi-clipboard"></i>
+                                                        </button>
+                                                    </td>
+                                                    <td>
+                                                        <small class="text-muted">
+                                                            ${new Date(user.createdAt).toLocaleDateString('es')}
+                                                        </small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button class="btn btn-sm btn-warning me-1"
+                                                                onclick="showEditUserModal('${user.email}')"
+                                                                title="Editar usuario">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-danger"
+                                                                onclick="handleDeleteUser('${user.email}')"
+                                                                title="Eliminar usuario"
+                                                                ${user.email === currentUser.email ? 'disabled' : ''}>
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información</h5>
+        <!-- Modal para editar usuario -->
+        <div class="modal fade" id="editUserModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Usuario</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="card-body">
-                        <h6>Credenciales de Acceso</h6>
-                        <div class="alert alert-secondary">
-                            <p><strong>Contraseña del Sistema:</strong></p>
-                            <code>${masterPassword}</code>
-                            <p class="mt-2 mb-0">
-                                <small class="text-muted">
-                                    <i class="bi bi-shield-lock"></i>
-                                    Todos los usuarios autorizados usan esta contraseña para ingresar
-                                </small>
-                            </p>
-                        </div>
-
-                        <hr />
-
-                        <h6>Instrucciones</h6>
-                        <ol>
-                            <li>Agregue el correo electrónico del usuario que desea autorizar</li>
-                            <li>Comparta la contraseña maestra con el usuario</li>
-                            <li>El usuario podrá iniciar sesión con su correo y la contraseña</li>
-                        </ol>
-
-                        <div class="alert alert-danger mt-3">
-                            <i class="bi bi-exclamation-octagon"></i>
-                            <strong>Seguridad:</strong>
-                            <small>
-                                Para cambiar la contraseña maestra, edite el archivo
-                                <code>js/auth.js</code> y modifique la variable
-                                <code>masterPassword</code>
-                            </small>
-                        </div>
+                    <div class="modal-body">
+                        <form id="editUserForm">
+                            <input type="hidden" id="editUserEmail" />
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-person"></i> Nombre
+                                </label>
+                                <input type="text" class="form-control" id="editUserName" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-key"></i> Nueva Contraseña (dejar vacío para mantener actual)
+                                </label>
+                                <input type="text" class="form-control" id="editUserPassword"
+                                       placeholder="Nueva contraseña" minlength="6" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-shield"></i> Rol
+                                </label>
+                                <select class="form-select" id="editUserRole">
+                                    <option value="user">Usuario</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-warning" onclick="handleUpdateUser()">
+                            <i class="bi bi-save"></i> Guardar Cambios
+                        </button>
                     </div>
                 </div>
             </div>
@@ -349,12 +434,95 @@ function renderManageAccessPage() {
     document.getElementById('manageAccessPage').innerHTML = manageAccessHtml;
 }
 
+function handleCreateUser(event) {
+    event.preventDefault();
+
+    const userData = {
+        email: document.getElementById('newUserEmail').value,
+        name: document.getElementById('newUserName').value,
+        password: document.getElementById('newUserPassword').value,
+        role: document.getElementById('newUserRole').value
+    };
+
+    const result = authManager.createUser(userData);
+
+    if (result.success) {
+        showToast(result.message, 'success');
+        document.getElementById('createUserForm').reset();
+        renderManageAccessPage();
+    } else {
+        showToast(result.message, 'error');
+    }
+}
+
+function showEditUserModal(email) {
+    const users = authManager.getAllUsers();
+    const user = users.find(u => u.email === email);
+
+    if (!user) {
+        showToast('Usuario no encontrado', 'error');
+        return;
+    }
+
+    document.getElementById('editUserEmail').value = user.email;
+    document.getElementById('editUserName').value = user.name;
+    document.getElementById('editUserPassword').value = '';
+    document.getElementById('editUserRole').value = user.role;
+
+    const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    modal.show();
+}
+
+function handleUpdateUser() {
+    const email = document.getElementById('editUserEmail').value;
+    const updates = {
+        name: document.getElementById('editUserName').value,
+        role: document.getElementById('editUserRole').value
+    };
+
+    const newPassword = document.getElementById('editUserPassword').value;
+    if (newPassword) {
+        updates.password = newPassword;
+    }
+
+    const result = authManager.updateUser(email, updates);
+
+    if (result.success) {
+        showToast(result.message, 'success');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+        modal.hide();
+        renderManageAccessPage();
+    } else {
+        showToast(result.message, 'error');
+    }
+}
+
+function handleDeleteUser(email) {
+    if (confirm(`¿Está seguro de eliminar el usuario ${email}?\n\nEsta acción no se puede deshacer.`)) {
+        const result = authManager.deleteUser(email);
+
+        if (result.success) {
+            showToast(result.message, 'success');
+            renderManageAccessPage();
+        } else {
+            showToast(result.message, 'error');
+        }
+    }
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Contraseña copiada al portapapeles', 'success');
+    }).catch(() => {
+        showToast('Error al copiar la contraseña', 'error');
+    });
+}
+
+// Funciones de compatibilidad (por si acaso)
 function handleAddUser(event) {
     event.preventDefault();
     const email = document.getElementById('newUserEmail').value;
-
     const result = authManager.addUser(email);
-
     if (result.success) {
         showToast(result.message, 'success');
         document.getElementById('newUserEmail').value = '';
