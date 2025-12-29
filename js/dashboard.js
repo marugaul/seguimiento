@@ -39,9 +39,15 @@ class DashboardManager {
 
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
-            // Normalizar el tipo de proyecto (trim, mayúsculas, remover espacios extras)
-            const tipoNormalizado = project.tipoProyecto ?
-                String(project.tipoProyecto).toUpperCase().trim().replace(/\s+/g, ' ') : '';
+            // Decodificar HTML entities y normalizar
+            let tipoNormalizado = '';
+            if (project.tipoProyecto) {
+                // Decodificar HTML entities (ej: &Oacute; → Ó)
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = project.tipoProyecto;
+                tipoNormalizado = (tempDiv.textContent || tempDiv.innerText || '')
+                    .toUpperCase().trim().replace(/\s+/g, ' ');
+            }
 
             if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
                 tipoNormalizado.includes('IMPLEMENTACION') ||
