@@ -849,8 +849,8 @@ class DashboardManager {
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
                 <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
-                <td class="text-end">${this.formatPercentage(project.porcentajeAvanceReal)}%</td>
-                <td class="text-end">${this.formatPercentage(project.porcentajeAvanceEsperado)}%</td>
+                <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
+                <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
                 <td class="text-center">${atrasadoBadge}</td>
                 <td class="text-center">${presupuestoBadge}</td>
                 <td class="text-center"><small>${project.comentarios || '-'}</small></td>
