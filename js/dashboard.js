@@ -762,7 +762,9 @@ class DashboardManager {
                                     ${this.generateSortableHeader('desvPorcentaje', '% Desv.', 'text-end')}
                                     ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
                                     ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
-                                    ${this.generateSortableHeader('alertaPresupuesto', 'Alerta', 'text-center')}
+                                    ${this.generateSortableHeader('estadoDesviacion', '¿Atrasado?', 'text-center')}
+                                    ${this.generateSortableHeader('alertaPresupuesto', '¿Fuera Presup.?', 'text-center')}
+                                    <th class="text-center">Comentarios</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -804,6 +806,13 @@ class DashboardManager {
         const desviacionColor = project.desvHoras < 0 ? 'text-success' :
                                project.desvHoras > 0 ? 'text-danger' : '';
 
+        // Indicadores Sí/No
+        const esAtrasado = project.estadoDesviacion === 'RETRASADO';
+        const atrasadoBadge = esAtrasado ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
+        const fueraPresupuesto = project.alertaPresupuesto === 'CRITICO';
+        const presupuestoBadge = fueraPresupuesto ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
         return `
             <tr>
                 <td><span class="badge bg-secondary">${project.tipo}</span></td>
@@ -816,10 +825,12 @@ class DashboardManager {
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
-                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}</strong></td>
-                <td class="text-end">${project.porcentajeAvanceReal}</td>
-                <td class="text-end">${project.porcentajeAvanceEsperado}</td>
-                <td class="text-center" title="${project.alertaPresupuesto}">${alertaSemaforo}</td>
+                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}%</strong></td>
+                <td class="text-end">${project.porcentajeAvanceReal}%</td>
+                <td class="text-end">${project.porcentajeAvanceEsperado}%</td>
+                <td class="text-center">${atrasadoBadge}</td>
+                <td class="text-center">${presupuestoBadge}</td>
+                <td class="text-center"><small>${project.comentarios || '-'}</small></td>
             </tr>
         `;
     }
