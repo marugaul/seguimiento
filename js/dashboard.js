@@ -26,6 +26,16 @@ class DashboardManager {
     }
 
     enrichProjects() {
+        // DEBUG: Mostrar primeros 3 proyectos para depuración
+        console.log('=== DEBUG: Primeros 3 proyectos ===');
+        this.projects.slice(0, 3).forEach((p, idx) => {
+            console.log(`Proyecto ${idx + 1}:`, {
+                nombre: p.nombreProyecto || p.nombre,
+                tipoProyecto: p.tipoProyecto,
+                tipoProyectoType: typeof p.tipoProyecto
+            });
+        });
+
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
             // Normalizar el tipo de proyecto (trim, mayúsculas, remover espacios extras)
@@ -46,6 +56,14 @@ class DashboardManager {
             } else {
                 project.categoria = 'OTRO';
                 project.numero = project.casoFs || project.iniciativa;
+                // Log solo los primeros 3 OTROS para no saturar la consola
+                if (this.projects.indexOf(project) < 3) {
+                    console.warn('⚠️ Categorizado como OTRO:', {
+                        nombre: project.nombreProyecto || project.nombre,
+                        tipoProyecto: project.tipoProyecto,
+                        tipoNormalizado: tipoNormalizado
+                    });
+                }
             }
 
             // Validar presupuesto basado en consumo real vs estimado
