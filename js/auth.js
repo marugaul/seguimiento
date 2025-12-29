@@ -1,34 +1,46 @@
 // Gestión de Autenticación
 class AuthManager {
     constructor() {
-        this.masterPassword = 'Admin2024!'; // Contraseña maestra
         this.currentUser = null;
         this.storageKey = 'seguimiento_auth';
-        this.usersKey = 'seguimiento_users';
+        this.usersKey = 'seguimiento_users_v2'; // Nueva versión para usuarios con contraseñas
         this.initDefaultUsers();
     }
 
     initDefaultUsers() {
-        if (!localStorage.getItem(this.usersKey)) {
-            const defaultUsers = ['admin@example.com'];
+        const existingUsers = localStorage.getItem(this.usersKey);
+        if (!existingUsers) {
+            // Crear usuario administrador por defecto
+            const defaultUsers = [
+                {
+                    email: 'admin@seguimiento.com',
+                    password: 'Admin2024!',
+                    role: 'admin',
+                    name: 'Administrador',
+                    createdAt: new Date().toISOString()
+                }
+            ];
             localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
         }
     }
 
     login(email, password) {
-        const authorizedUsers = this.getAuthorizedUsers();
+        const users = this.getAllUsers();
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-        if (password !== this.masterPassword) {
+        if (!user) {
+            return { success: false, message: 'Usuario no encontrado' };
+        }
+
+        if (user.password !== password) {
             return { success: false, message: 'Contraseña incorrecta' };
         }
 
-        if (!authorizedUsers.includes(email.toLowerCase())) {
-            return { success: false, message: 'Usuario no autorizado' };
-        }
-
-        this.currentUser = email;
+        this.currentUser = user;
         const authData = {
-            email: email,
+            email: user.email,
+            role: user.role,
+            name: user.name,
             loginTime: new Date().toISOString()
         };
         localStorage.setItem(this.storageKey, JSON.stringify(authData));
@@ -47,7 +59,7 @@ class AuthManager {
 
         try {
             const data = JSON.parse(authData);
-            this.currentUser = data.email;
+            this.currentUser = data;
             return true;
         } catch {
             return false;
@@ -59,8 +71,7 @@ class AuthManager {
             const authData = localStorage.getItem(this.storageKey);
             if (authData) {
                 try {
-                    const data = JSON.parse(authData);
-                    this.currentUser = data.email;
+                    this.currentUser = JSON.parse(authData);
                 } catch {
                     this.currentUser = null;
                 }
@@ -69,35 +80,95 @@ class AuthManager {
         return this.currentUser;
     }
 
-    getAuthorizedUsers() {
+    isAdmin() {
+        const user = this.getCurrentUser();
+        return user && user.role === 'admin';
+    }
+
+    getAllUsers() {
         const users = localStorage.getItem(this.usersKey);
         return users ? JSON.parse(users) : [];
     }
 
-    addUser(email) {
-        const users = this.getAuthorizedUsers();
-        const emailLower = email.toLowerCase();
-
-        if (!users.includes(emailLower)) {
-            users.push(emailLower);
-            localStorage.setItem(this.usersKey, JSON.stringify(users));
-            return { success: true, message: 'Usuario agregado exitosamente' };
+    createUser(userData) {
+        if (!this.isAdmin()) {
+            return { success: false, message: 'Solo los administradores pueden crear usuarios' };
         }
 
-        return { success: false, message: 'El usuario ya existe' };
+        const users = this.getAllUsers();
+        const emailLower = userData.email.toLowerCase();
+
+        if (users.find(u => u.email.toLowerCase() === emailLower)) {
+            return { success: false, message: 'El usuario ya existe' };
+        }
+
+        const newUser = {
+            email: emailLower,
+            password: userData.password,
+            role: userData.role || 'user',
+            name: userData.name || emailLower,
+            createdAt: new Date().toISOString()
+        };
+
+        users.push(newUser);
+        localStorage.setItem(this.usersKey, JSON.stringify(users));
+        return { success: true, message: 'Usuario creado exitosamente' };
     }
 
-    removeUser(email) {
-        const users = this.getAuthorizedUsers();
-        const emailLower = email.toLowerCase();
-        const filteredUsers = users.filter(u => u !== emailLower);
+    updateUser(email, updates) {
+        if (!this.isAdmin()) {
+            return { success: false, message: 'Solo los administradores pueden actualizar usuarios' };
+        }
 
+        const users = this.getAllUsers();
+        const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+
+        if (userIndex === -1) {
+            return { success: false, message: 'Usuario no encontrado' };
+        }
+
+        // Actualizar campos permitidos
+        if (updates.password) users[userIndex].password = updates.password;
+        if (updates.name) users[userIndex].name = updates.name;
+        if (updates.role) users[userIndex].role = updates.role;
+        users[userIndex].updatedAt = new Date().toISOString();
+
+        localStorage.setItem(this.usersKey, JSON.stringify(users));
+        return { success: true, message: 'Usuario actualizado exitosamente' };
+    }
+
+    deleteUser(email) {
+        if (!this.isAdmin()) {
+            return { success: false, message: 'Solo los administradores pueden eliminar usuarios' };
+        }
+
+        const users = this.getAllUsers();
+        const emailLower = email.toLowerCase();
+
+        // No permitir eliminar el último admin
+        const adminUsers = users.filter(u => u.role === 'admin');
+        const userToDelete = users.find(u => u.email.toLowerCase() === emailLower);
+
+        if (userToDelete && userToDelete.role === 'admin' && adminUsers.length === 1) {
+            return { success: false, message: 'No se puede eliminar el último administrador' };
+        }
+
+        const filteredUsers = users.filter(u => u.email.toLowerCase() !== emailLower);
         localStorage.setItem(this.usersKey, JSON.stringify(filteredUsers));
         return { success: true, message: 'Usuario eliminado exitosamente' };
     }
 
-    getMasterPassword() {
-        return this.masterPassword;
+    // Compatibilidad con código antiguo
+    getAuthorizedUsers() {
+        return this.getAllUsers().map(u => u.email);
+    }
+
+    addUser(email) {
+        return this.createUser({ email, password: 'ChangeMe123!', name: email });
+    }
+
+    removeUser(email) {
+        return this.deleteUser(email);
     }
 }
 
