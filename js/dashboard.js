@@ -102,6 +102,19 @@ class DashboardManager {
             const desviacionAvance = project.avanceEsperadoNumerico - project.avanceRealNumerico;
             project.estadoDesviacion = desviacionAvance > 10 ? 'RETRASADO' :
                                       desviacionAvance < -10 ? 'ADELANTADO' : 'EN_TIEMPO';
+
+            // DEBUG: Log primeros 3 proyectos con porcentajes
+            if (this.projects.indexOf(project) < 3) {
+                console.log(`📊 Proyecto ${this.projects.indexOf(project) + 1}:`, {
+                    nombre: (project.nombreProyecto || project.nombre || '').substring(0, 40),
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
         });
     }
 
