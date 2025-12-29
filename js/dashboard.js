@@ -779,6 +779,7 @@ class DashboardManager {
                                     ${this.generateSortableHeader('pais', 'País')}
                                     ${this.generateSortableHeader('nombre', 'Nombre')}
                                     ${this.generateSortableHeader('estado', 'Estado')}
+                                    ${this.generateSortableHeader('fecRegistroIniciativa', 'Fecha Registro', 'text-center')}
                                     ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
                                     ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
                                     ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
@@ -836,6 +837,14 @@ class DashboardManager {
         const fueraPresupuesto = project.alertaPresupuesto === 'CRITICO';
         const presupuestoBadge = fueraPresupuesto ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
 
+        // Formatear fecha de registro
+        const fechaRegistro = project.fecRegistroIniciativa ?
+            new Date(project.fecRegistroIniciativa).toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }) : '-';
+
         return `
             <tr>
                 <td><span class="badge bg-secondary">${project.tipo}</span></td>
@@ -845,6 +854,7 @@ class DashboardManager {
                 <td>${project.pais}</td>
                 <td><small>${project.nombre.substring(0, 40)}${project.nombre.length > 40 ? '...' : ''}</small></td>
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
+                <td class="text-center"><small>${fechaRegistro}</small></td>
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
