@@ -98,6 +98,13 @@ class DashboardManager {
             project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
             project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
 
+            // Calcular % Presupuesto Usado: (Hrs Registradas / Hrs Estimadas) * 100
+            project.porcentajePresupuestoUsado = project.totalEstimacion > 0 ?
+                (project.totalRegistrado / project.totalEstimacion) * 100 : 0;
+
+            // Calcular Diferencia Avance vs Presupuesto: % Presupuesto Usado - % Avance Real
+            project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
+
             // Determinar si está desviado (más de 10% de diferencia)
             const desviacionAvance = project.avanceEsperadoNumerico - project.avanceRealNumerico;
             project.estadoDesviacion = desviacionAvance > 10 ? 'RETRASADO' :
@@ -786,6 +793,8 @@ class DashboardManager {
                                     ${this.generateSortableHeader('porcentajeDesviacion', '% Desv.', 'text-end')}
                                     ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
                                     ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
+                                    ${this.generateSortableHeader('porcentajePresupuestoUsado', '% Presup. Usado', 'text-end')}
+                                    ${this.generateSortableHeader('difAvanceVsPresupuesto', 'Dif. Avance vs Presup.', 'text-end')}
                                     ${this.generateSortableHeader('estadoDesviacion', '¿Atrasado?', 'text-center')}
                                     ${this.generateSortableHeader('alertaPresupuesto', '¿Fuera Presup.?', 'text-center')}
                                     <th class="text-center">Comentarios</th>
@@ -856,6 +865,10 @@ class DashboardManager {
                 <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
                 <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
                 <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
+                <td class="text-end"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
+                <td class="text-end ${project.difAvanceVsPresupuesto > 0 ? 'text-danger' : project.difAvanceVsPresupuesto < 0 ? 'text-success' : ''}">
+                    <strong>${project.difAvanceVsPresupuesto.toFixed(2)}%</strong>
+                </td>
                 <td class="text-center">${atrasadoBadge}</td>
                 <td class="text-center">${presupuestoBadge}</td>
                 <td class="text-center"><small>${project.comentarios || '-'}</small></td>
