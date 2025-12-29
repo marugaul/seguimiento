@@ -777,12 +777,12 @@ class DashboardManager {
                                     ${this.generateSortableHeader('numero', 'Número')}
                                     ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
                                     ${this.generateSortableHeader('pais', 'País')}
-                                    ${this.generateSortableHeader('nombreProyecto', 'Nombre')}
+                                    ${this.generateSortableHeader('nombre', 'Nombre')}
                                     ${this.generateSortableHeader('estado', 'Estado')}
                                     ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
                                     ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
                                     ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
-                                    ${this.generateSortableHeader('desvPorcentaje', '% Desv.', 'text-end')}
+                                    ${this.generateSortableHeader('porcentajeDesviacion', '% Desv.', 'text-end')}
                                     ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
                                     ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
                                     ${this.generateSortableHeader('estadoDesviacion', '¿Atrasado?', 'text-center')}
