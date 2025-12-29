@@ -837,13 +837,8 @@ class DashboardManager {
         const fueraPresupuesto = project.alertaPresupuesto === 'CRITICO';
         const presupuestoBadge = fueraPresupuesto ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
 
-        // Formatear fecha de registro
-        const fechaRegistro = project.fecRegistroIniciativa ?
-            new Date(project.fecRegistroIniciativa).toLocaleDateString('es-ES', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            }) : '-';
+        // Mostrar fecha de registro tal como viene del Excel
+        const fechaRegistro = project.fecRegistroIniciativa || '-';
 
         return `
             <tr>
