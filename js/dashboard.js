@@ -28,14 +28,19 @@ class DashboardManager {
     enrichProjects() {
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
-            if (project.tipoProyecto.toUpperCase().includes('IMPLEMENTACIÓN') ||
-                project.tipoProyecto.toUpperCase().includes('IMPLEMENTACION')) {
+            // Normalizar el tipo de proyecto (trim, mayúsculas, remover espacios extras)
+            const tipoNormalizado = project.tipoProyecto ?
+                String(project.tipoProyecto).toUpperCase().trim().replace(/\s+/g, ' ') : '';
+
+            if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
+                tipoNormalizado.includes('IMPLEMENTACION') ||
+                tipoNormalizado.includes('PROYECTO')) {
                 project.categoria = 'PROYECTO';
                 project.numero = project.iniciativa;
-            } else if (project.tipoProyecto.toUpperCase().includes('SOPORTE')) {
+            } else if (tipoNormalizado.includes('SOPORTE')) {
                 project.categoria = 'SOPORTE';
                 project.numero = project.casoFs;
-            } else if (project.tipoProyecto.toUpperCase().includes('REQUERIMIENTO')) {
+            } else if (tipoNormalizado.includes('REQUERIMIENTO')) {
                 project.categoria = 'REQUERIMIENTO';
                 project.numero = project.casoFs;
             } else {
@@ -81,9 +86,24 @@ class DashboardManager {
 
     parsePercentage(percentStr) {
         if (!percentStr) return 0;
-        const cleaned = String(percentStr).replace('%', '').trim();
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : num;
+
+        // Convertir a string y limpiar
+        let cleaned = String(percentStr)
+            .replace('%', '')
+            .replace(',', '.') // Convertir comas a puntos para decimales
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return 0;
+
+        // Si el número está en formato decimal (ej: 0.6 en lugar de 60%), multiplicar por 100
+        if (num > 0 && num < 1) {
+            num = num * 100;
+        }
+
+        return num;
     }
 
     applyFilters() {
