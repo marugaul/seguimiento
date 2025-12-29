@@ -361,6 +361,11 @@ function renderManageAccessPage() {
                                                         </small>
                                                     </td>
                                                     <td class="text-center">
+                                                        <button class="btn btn-sm btn-info me-1"
+                                                                onclick="showAuditLogModal('${user.email}')"
+                                                                title="Ver bitácora de acceso">
+                                                            <i class="bi bi-clock-history"></i>
+                                                        </button>
                                                         <button class="btn btn-sm btn-warning me-1"
                                                                 onclick="showEditUserModal('${user.email}')"
                                                                 title="Editar usuario">
@@ -425,6 +430,26 @@ function renderManageAccessPage() {
                         <button type="button" class="btn btn-warning" onclick="handleUpdateUser()">
                             <i class="bi bi-save"></i> Guardar Cambios
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para bitácora de acceso -->
+        <div class="modal fade" id="auditLogModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="bi bi-clock-history"></i> Bitácora de Acceso</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="auditLogContent">
+                            <!-- El contenido se llenará dinámicamente -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     </div>
                 </div>
             </div>
@@ -516,6 +541,79 @@ function copyToClipboard(text) {
     }).catch(() => {
         showToast('Error al copiar la contraseña', 'error');
     });
+}
+
+function showAuditLogModal(email) {
+    if (!authManager.isAdmin()) {
+        showToast('Solo los administradores pueden ver la bitácora', 'error');
+        return;
+    }
+
+    const users = authManager.getAllUsers();
+    const user = users.find(u => u.email === email);
+    const logs = authManager.getAuditLogs(email);
+
+    const eventTypeLabels = {
+        'login': '<span class="badge bg-success">Ingreso</span>',
+        'logout': '<span class="badge bg-secondary">Salida</span>',
+        'login_failed': '<span class="badge bg-danger">Intento Fallido</span>'
+    };
+
+    const auditLogHtml = `
+        <div class="mb-3">
+            <h6>Usuario: <strong>${user ? user.name : email}</strong> (${email})</h6>
+            <p class="text-muted">Total de eventos: ${logs.length}</p>
+        </div>
+
+        ${logs.length === 0 ? `
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                No hay registros de acceso para este usuario.
+            </div>
+        ` : `
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th>Fecha y Hora</th>
+                            <th>Evento</th>
+                            <th>Detalles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${logs.slice().reverse().map(log => `
+                            <tr>
+                                <td>
+                                    <small>
+                                        ${new Date(log.timestamp).toLocaleString('es-ES', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit'
+                                        })}
+                                    </small>
+                                </td>
+                                <td>${eventTypeLabels[log.eventType] || log.eventType}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        ${log.details.reason ? log.details.reason :
+                                          log.details.role ? `Rol: ${log.details.role}` : '-'}
+                                    </small>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `}
+    `;
+
+    document.getElementById('auditLogContent').innerHTML = auditLogHtml;
+
+    const modal = new bootstrap.Modal(document.getElementById('auditLogModal'));
+    modal.show();
 }
 
 // Funciones de compatibilidad (por si acaso)
