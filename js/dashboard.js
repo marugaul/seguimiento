@@ -116,11 +116,15 @@ class DashboardManager {
                 });
             }
 
-            // DEBUG: Buscar proyecto específico MOP-PCRC-IMP001
-            const nombreProj = project.nombreProyecto || project.nombre || '';
-            if (nombreProj.includes('MOP-PCRC-IMP001')) {
-                console.warn('🔍 ENCONTRADO MOP-PCRC-IMP001:', {
-                    nombre: nombreProj,
+            // DEBUG: Buscar proyectos específicos por INICIATIVA, PROYECTO FS o NOMBRE
+            const nombreCompleto = project.nombreProyecto || project.nombre || '';
+            if ((project.iniciativa && project.iniciativa.includes('INCRC-359')) ||
+                (project.proyectoFs && project.proyectoFs.includes('MOP-PCRC-IMP001')) ||
+                nombreCompleto.includes('INCRC-359-2024')) {
+                console.warn('🔍 ENCONTRADO PROYECTO:', {
+                    iniciativa: project.iniciativa,
+                    proyectoFs: project.proyectoFs,
+                    nombre: nombreCompleto.substring(0, 50),
                     avanceReal: project.porcentajeAvanceReal,
                     avanceEsperado: project.porcentajeAvanceEsperado,
                     avanceRealNum: project.avanceRealNumerico,
