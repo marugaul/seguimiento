@@ -150,8 +150,8 @@ class DashboardManager {
         // Si es NaN, retornar 0
         if (isNaN(num)) return 0;
 
-        // Si el número está en formato decimal (ej: 0.6 en lugar de 60%), multiplicar por 100
-        if (num > 0 && num < 1) {
+        // Si el número está en formato decimal (ej: 0.6 = 60%, 1 = 100%), multiplicar por 100
+        if (num >= 0 && num <= 1) {
             num = num * 100;
         }
 
