@@ -4,6 +4,7 @@ class AuthManager {
         this.currentUser = null;
         this.storageKey = 'seguimiento_auth';
         this.usersKey = 'seguimiento_users_v2'; // Nueva versión para usuarios con contraseñas
+        this.auditLogKey = 'seguimiento_audit_log'; // Bitácora de accesos
         this.initDefaultUsers();
     }
 
@@ -24,15 +25,46 @@ class AuthManager {
         }
     }
 
+    logEvent(email, eventType, details = {}) {
+        const logs = this.getAuditLogs();
+        const logEntry = {
+            email: email,
+            eventType: eventType, // 'login' o 'logout'
+            timestamp: new Date().toISOString(),
+            details: details
+        };
+        logs.push(logEntry);
+
+        // Mantener solo los últimos 500 registros
+        if (logs.length > 500) {
+            logs.shift();
+        }
+
+        localStorage.setItem(this.auditLogKey, JSON.stringify(logs));
+    }
+
+    getAuditLogs(email = null) {
+        const logsStr = localStorage.getItem(this.auditLogKey);
+        const logs = logsStr ? JSON.parse(logsStr) : [];
+
+        if (email) {
+            return logs.filter(log => log.email.toLowerCase() === email.toLowerCase());
+        }
+
+        return logs;
+    }
+
     login(email, password) {
         const users = this.getAllUsers();
         const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
         if (!user) {
+            this.logEvent(email, 'login_failed', { reason: 'Usuario no encontrado' });
             return { success: false, message: 'Usuario no encontrado' };
         }
 
         if (user.password !== password) {
+            this.logEvent(email, 'login_failed', { reason: 'Contraseña incorrecta' });
             return { success: false, message: 'Contraseña incorrecta' };
         }
 
@@ -45,10 +77,16 @@ class AuthManager {
         };
         localStorage.setItem(this.storageKey, JSON.stringify(authData));
 
+        // Registrar login exitoso
+        this.logEvent(email, 'login', { name: user.name, role: user.role });
+
         return { success: true };
     }
 
     logout() {
+        if (this.currentUser) {
+            this.logEvent(this.currentUser.email || this.currentUser, 'logout', {});
+        }
         this.currentUser = null;
         localStorage.removeItem(this.storageKey);
     }
