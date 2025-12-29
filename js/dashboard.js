@@ -158,6 +158,29 @@ class DashboardManager {
         return num;
     }
 
+    formatPercentage(value) {
+        if (!value && value !== 0) return '0';
+
+        // Convertir a string y limpiar
+        let cleaned = String(value)
+            .replace('%', '')
+            .replace(',', '.')
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return '0';
+
+        // Si el número está en formato decimal (ej: 0.5 = 50%, 0.76 = 76%), multiplicar por 100
+        if (num > -1 && num < 1 && num !== 0) {
+            num = num * 100;
+        }
+
+        // Redondear a 2 decimales
+        return num.toFixed(2);
+    }
+
     applyFilters() {
         this.filteredProjects = this.projects.filter(project => {
             if (this.filters.lider && project.nombreLt !== this.filters.lider) return false;
@@ -825,9 +848,9 @@ class DashboardManager {
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
-                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}%</strong></td>
-                <td class="text-end">${project.porcentajeAvanceReal}%</td>
-                <td class="text-end">${project.porcentajeAvanceEsperado}%</td>
+                <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
+                <td class="text-end">${this.formatPercentage(project.porcentajeAvanceReal)}%</td>
+                <td class="text-end">${this.formatPercentage(project.porcentajeAvanceEsperado)}%</td>
                 <td class="text-center">${atrasadoBadge}</td>
                 <td class="text-center">${presupuestoBadge}</td>
                 <td class="text-center"><small>${project.comentarios || '-'}</small></td>
