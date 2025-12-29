@@ -115,6 +115,20 @@ class DashboardManager {
                     estado: project.estadoDesviacion
                 });
             }
+
+            // DEBUG: Buscar proyecto específico MOP-PCRC-IMP001
+            const nombreProj = project.nombreProyecto || project.nombre || '';
+            if (nombreProj.includes('MOP-PCRC-IMP001')) {
+                console.warn('🔍 ENCONTRADO MOP-PCRC-IMP001:', {
+                    nombre: nombreProj,
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
         });
     }
 
