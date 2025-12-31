@@ -10,8 +10,12 @@ class DashboardManager {
             estado: '',
             etapa: '',
             tipo: '',           // LOCAL o REGIONAL
-            categoria: ''       // PROYECTO, SOPORTE, REQUERIMIENTO
+            categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
+            alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
+            estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
+        this.sortColumn = '';
+        this.sortDirection = 'asc'; // 'asc' o 'desc'
     }
 
     loadProjects() {
@@ -22,33 +26,68 @@ class DashboardManager {
     }
 
     enrichProjects() {
+        // DEBUG: Mostrar primeros 5 proyectos en formato tabla
+        console.log('=== DEBUG: Primeros 5 proyectos ===');
+        const debugData = this.projects.slice(0, 5).map((p, idx) => ({
+            '#': idx + 1,
+            'Nombre': (p.nombreProyecto || p.nombre || '').substring(0, 30),
+            'Tipo Proyecto': p.tipoProyecto || '(vacío)',
+            'Tipo (type)': typeof p.tipoProyecto,
+            'Tipo Length': p.tipoProyecto ? String(p.tipoProyecto).length : 0
+        }));
+        console.table(debugData);
+
         this.projects.forEach(project => {
             // Determinar categoría basándose en TIPO PROYECTO
-            if (project.tipoProyecto.toUpperCase().includes('IMPLEMENTACIÓN') ||
-                project.tipoProyecto.toUpperCase().includes('IMPLEMENTACION')) {
+            // Decodificar HTML entities y normalizar
+            let tipoNormalizado = '';
+            if (project.tipoProyecto) {
+                // Decodificar HTML entities (ej: &Oacute; → Ó)
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = project.tipoProyecto;
+                tipoNormalizado = (tempDiv.textContent || tempDiv.innerText || '')
+                    .toUpperCase().trim().replace(/\s+/g, ' ');
+            }
+
+            if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
+                tipoNormalizado.includes('IMPLEMENTACION') ||
+                tipoNormalizado.includes('PROYECTO')) {
                 project.categoria = 'PROYECTO';
                 project.numero = project.iniciativa;
-            } else if (project.tipoProyecto.toUpperCase().includes('SOPORTE')) {
+            } else if (tipoNormalizado.includes('SOPORTE')) {
                 project.categoria = 'SOPORTE';
                 project.numero = project.casoFs;
-            } else if (project.tipoProyecto.toUpperCase().includes('REQUERIMIENTO')) {
+            } else if (tipoNormalizado.includes('REQUERIMIENTO')) {
                 project.categoria = 'REQUERIMIENTO';
                 project.numero = project.casoFs;
             } else {
                 project.categoria = 'OTRO';
                 project.numero = project.casoFs || project.iniciativa;
+                // Log solo los primeros 3 OTROS para no saturar la consola
+                if (this.projects.indexOf(project) < 3) {
+                    console.warn(`⚠️ OTRO: "${project.nombreProyecto || project.nombre}" | Tipo: "${project.tipoProyecto}" | Normalizado: "${tipoNormalizado}"`);
+                }
             }
 
-            // Validar presupuesto: (Estimación + Control Cambio) vs (Total Registrado + Total Disponible)
-            const presupuestoTotal = project.estimacion + project.controlCambio;
-            const consumoTotal = project.totalRegistrado + project.totalDisponible;
+            // Validar presupuesto basado en consumo real vs estimado
+            const presupuestoPlaneado = project.estimacion + project.controlCambio;
+            const horasConsumidas = project.totalRegistrado;
 
-            if (presupuestoTotal > consumoTotal) {
-                project.alertaPresupuesto = 'CRITICO'; // Rojo
-            } else if (presupuestoTotal === consumoTotal) {
-                project.alertaPresupuesto = 'OK'; // Verde
+            // Calcular porcentaje de consumo
+            const porcentajeConsumo = presupuestoPlaneado > 0 ?
+                (horasConsumidas / presupuestoPlaneado) * 100 : 0;
+
+            // Lógica de alertas:
+            // - CRITICO (🔴): Ya se consumieron más horas de las estimadas (o Total Disponible negativo)
+            // - ADVERTENCIA (🟡): Se ha consumido 85% o más del presupuesto (falta 15% o menos)
+            // - OK (🟢): Consumo normal, aún hay margen suficiente
+
+            if (horasConsumidas > presupuestoPlaneado || project.totalDisponible < 0) {
+                project.alertaPresupuesto = 'CRITICO'; // 🔴 Presupuesto excedido
+            } else if (porcentajeConsumo >= 85) {
+                project.alertaPresupuesto = 'ADVERTENCIA'; // 🟡 Falta 15% o menos
             } else {
-                project.alertaPresupuesto = 'ADVERTENCIA'; // Amarillo - hay más presupuesto del necesario
+                project.alertaPresupuesto = 'OK'; // 🟢 Dentro del presupuesto
             }
 
             // Calcular desviación absoluta
@@ -59,18 +98,94 @@ class DashboardManager {
             project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
             project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
 
+            // Calcular % Presupuesto Usado: (Hrs Registradas / Hrs Estimadas) * 100
+            project.porcentajePresupuestoUsado = project.totalEstimacion > 0 ?
+                (project.totalRegistrado / project.totalEstimacion) * 100 : 0;
+
+            // Calcular Diferencia Avance vs Presupuesto: % Presupuesto Usado - % Avance Real
+            project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
+
             // Determinar si está desviado (más de 10% de diferencia)
             const desviacionAvance = project.avanceEsperadoNumerico - project.avanceRealNumerico;
             project.estadoDesviacion = desviacionAvance > 10 ? 'RETRASADO' :
                                       desviacionAvance < -10 ? 'ADELANTADO' : 'EN_TIEMPO';
+
+            // DEBUG: Log primeros 3 proyectos con porcentajes
+            if (this.projects.indexOf(project) < 3) {
+                console.log(`📊 Proyecto ${this.projects.indexOf(project) + 1}:`, {
+                    nombre: (project.nombreProyecto || project.nombre || '').substring(0, 40),
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
+
+            // DEBUG: Buscar proyectos específicos por INICIATIVA, PROYECTO FS o NOMBRE
+            const nombreCompleto = project.nombreProyecto || project.nombre || '';
+            if ((project.iniciativa && project.iniciativa.includes('INCRC-359')) ||
+                (project.proyectoFs && project.proyectoFs.includes('MOP-PCRC-IMP001')) ||
+                nombreCompleto.includes('INCRC-359-2024')) {
+                console.warn('🔍 ENCONTRADO PROYECTO:', {
+                    iniciativa: project.iniciativa,
+                    proyectoFs: project.proyectoFs,
+                    nombre: nombreCompleto.substring(0, 50),
+                    avanceReal: project.porcentajeAvanceReal,
+                    avanceEsperado: project.porcentajeAvanceEsperado,
+                    avanceRealNum: project.avanceRealNumerico,
+                    avanceEsperadoNum: project.avanceEsperadoNumerico,
+                    desviacion: desviacionAvance,
+                    estado: project.estadoDesviacion
+                });
+            }
         });
     }
 
     parsePercentage(percentStr) {
         if (!percentStr) return 0;
-        const cleaned = String(percentStr).replace('%', '').trim();
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : num;
+
+        // Convertir a string y limpiar
+        let cleaned = String(percentStr)
+            .replace('%', '')
+            .replace(',', '.') // Convertir comas a puntos para decimales
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return 0;
+
+        // Si el número está en formato decimal (ej: 0.6 = 60%, 1 = 100%), multiplicar por 100
+        if (num >= 0 && num <= 1) {
+            num = num * 100;
+        }
+
+        return num;
+    }
+
+    formatPercentage(value) {
+        if (!value && value !== 0) return '0';
+
+        // Convertir a string y limpiar
+        let cleaned = String(value)
+            .replace('%', '')
+            .replace(',', '.')
+            .trim();
+
+        let num = parseFloat(cleaned);
+
+        // Si es NaN, retornar 0
+        if (isNaN(num)) return '0';
+
+        // Si el número está en formato decimal (ej: 0.5 = 50%, 0.76 = 76%), multiplicar por 100
+        if (num > -1 && num < 1 && num !== 0) {
+            num = num * 100;
+        }
+
+        // Redondear a 2 decimales
+        return num.toFixed(2);
     }
 
     applyFilters() {
@@ -81,18 +196,77 @@ class DashboardManager {
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
             if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
+            if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
+            if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
         });
+        this.applySorting();
+    }
+
+    applySorting() {
+        if (!this.sortColumn) return;
+
+        this.filteredProjects.sort((a, b) => {
+            let valA = a[this.sortColumn];
+            let valB = b[this.sortColumn];
+
+            // Manejar valores nulos o undefined
+            if (valA === null || valA === undefined) valA = '';
+            if (valB === null || valB === undefined) valB = '';
+
+            // Convertir a números si es posible
+            const numA = parseFloat(valA);
+            const numB = parseFloat(valB);
+
+            let comparison = 0;
+            if (!isNaN(numA) && !isNaN(numB)) {
+                comparison = numA - numB;
+            } else {
+                comparison = String(valA).localeCompare(String(valB));
+            }
+
+            return this.sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    sortBy(column) {
+        if (this.sortColumn === column) {
+            // Cambiar dirección si es la misma columna
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            // Nueva columna, ordenar ascendente
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        this.applySorting();
+        this.render();
     }
 
     setFilter(filterName, value) {
         this.filters[filterName] = value;
         this.applyFilters();
         this.render();
+
+        // Scroll a la tabla de proyectos después de un pequeño delay
+        setTimeout(() => {
+            const tabla = document.getElementById('projectsTable');
+            if (tabla) {
+                tabla.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 300);
     }
 
     clearFilters() {
-        this.filters = { lider: '', pais: '', estado: '', etapa: '', tipo: '', categoria: '' };
+        this.filters = {
+            lider: '',
+            pais: '',
+            estado: '',
+            etapa: '',
+            tipo: '',
+            categoria: '',
+            alertaPresupuesto: '',
+            estadoDesviacion: ''
+        };
         this.applyFilters();
         this.render();
     }
@@ -100,6 +274,28 @@ class DashboardManager {
     getUniqueValues(field) {
         const values = [...new Set(this.projects.map(p => p[field]))];
         return values.filter(v => v).sort();
+    }
+
+    getActiveFiltersHTML() {
+        const badges = [];
+        const filterLabels = {
+            categoria: 'Categoría',
+            alertaPresupuesto: 'Alerta',
+            estadoDesviacion: 'Estado',
+            lider: 'Líder',
+            pais: 'País',
+            estado: 'Estado Proyecto',
+            etapa: 'Etapa',
+            tipo: 'Tipo'
+        };
+
+        for (const [key, value] of Object.entries(this.filters)) {
+            if (value) {
+                badges.push(`<span class="badge bg-primary ms-2">${filterLabels[key]}: ${value}</span>`);
+            }
+        }
+
+        return badges.join('');
     }
 
     getStats() {
@@ -266,29 +462,29 @@ class DashboardManager {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-success text-white" onclick="dashboardManager.setFilter('categoria', 'PROYECTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-diagram-3"></i> Proyectos</h6>
                             <h2>${stats.totalProyectos}</h2>
-                            <small>Implementaciones</small>
+                            <small>Implementaciones (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                    <div class="card bg-info text-white" onclick="dashboardManager.setFilter('categoria', 'SOPORTE')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-tools"></i> Soportes</h6>
                             <h2>${stats.totalSoportes}</h2>
-                            <small>Casos de soporte</small>
+                            <small>Casos de soporte (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card bg-warning text-white" onclick="dashboardManager.setFilter('categoria', 'REQUERIMIENTO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-clipboard-check"></i> Requerimientos</h6>
                             <h2>${stats.totalRequerimientos}</h2>
-                            <small>Solicitudes</small>
+                            <small>Solicitudes (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -297,20 +493,20 @@ class DashboardManager {
             <!-- Tarjetas de alertas y métricas -->
             <div class="row mb-4">
                 <div class="col-md-3">
-                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white">
+                    <div class="card ${stats.alertasCriticas > 0 ? 'bg-danger' : 'bg-success'} text-white" onclick="dashboardManager.setFilter('alertaPresupuesto', 'CRITICO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-exclamation-triangle"></i> Alertas Presupuesto</h6>
                             <h2>${stats.alertasCriticas}</h2>
-                            <small>Proyectos con presupuesto excedido</small>
+                            <small>Presupuesto excedido (click para detalle)</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-danger text-white">
+                    <div class="card bg-danger text-white" onclick="dashboardManager.setFilter('estadoDesviacion', 'RETRASADO')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="card-body">
                             <h6><i class="bi bi-arrow-down-circle"></i> Retrasados</h6>
                             <h2>${stats.retrasados}</h2>
-                            <small>Con desviación negativa</small>
+                            <small>Con desviación negativa (click para detalle)</small>
                         </div>
                     </div>
                 </div>
@@ -568,29 +764,40 @@ class DashboardManager {
             </div>
 
             <!-- Tabla de proyectos mejorada -->
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)</h5>
+            <div class="card" id="projectsTable">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
+                        ${this.getActiveFiltersHTML()}
+                    </h5>
+                    ${Object.values(this.filters).some(f => f) ?
+                        '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
+                        : ''}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-striped table-hover table-sm">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>Tipo</th>
-                                    <th>Categoría</th>
-                                    <th>Número</th>
-                                    <th>Líder Técnico</th>
-                                    <th>País</th>
-                                    <th>Nombre</th>
-                                    <th>Estado</th>
-                                    <th class="text-end">Hrs Est.</th>
-                                    <th class="text-end">Hrs Reg.</th>
-                                    <th class="text-end">Desv. Hrs</th>
-                                    <th class="text-end">% Desv.</th>
-                                    <th class="text-end">% Real</th>
-                                    <th class="text-end">% Esperado</th>
-                                    <th class="text-center">Alerta</th>
+                                    ${this.generateSortableHeader('tipo', 'Tipo')}
+                                    ${this.generateSortableHeader('categoria', 'Categoría')}
+                                    ${this.generateSortableHeader('numero', 'Número')}
+                                    ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
+                                    ${this.generateSortableHeader('pais', 'País')}
+                                    ${this.generateSortableHeader('nombre', 'Nombre')}
+                                    ${this.generateSortableHeader('estado', 'Estado')}
+                                    ${this.generateSortableHeader('fecRegistroIniciativa', 'Fecha Registro', 'text-center')}
+                                    ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
+                                    ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
+                                    ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
+                                    ${this.generateSortableHeader('porcentajeDesviacion', '% Desv.', 'text-end')}
+                                    ${this.generateSortableHeader('avanceRealNumerico', '% Real', 'text-end')}
+                                    ${this.generateSortableHeader('avanceEsperadoNumerico', '% Esperado', 'text-end')}
+                                    ${this.generateSortableHeader('porcentajePresupuestoUsado', '% Presup. Usado', 'text-end')}
+                                    ${this.generateSortableHeader('difAvanceVsPresupuesto', 'Dif. Avance vs Presup.', 'text-end')}
+                                    ${this.generateSortableHeader('estadoDesviacion', '¿Atrasado?', 'text-center')}
+                                    ${this.generateSortableHeader('alertaPresupuesto', '¿Fuera Presup.?', 'text-center')}
+                                    <th class="text-center">Comentarios</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -601,6 +808,22 @@ class DashboardManager {
                 </div>
             </div>
         `;
+    }
+
+    generateSortableHeader(column, label, className = '') {
+        const isActive = this.sortColumn === column;
+        const icon = !isActive ? '<i class="bi bi-arrow-down-up ms-1"></i>' :
+                    this.sortDirection === 'asc' ? '<i class="bi bi-arrow-up ms-1"></i>' :
+                    '<i class="bi bi-arrow-down ms-1"></i>';
+
+        const activeClass = isActive ? 'bg-primary' : '';
+
+        return `<th class="${className} ${activeClass}"
+                    onclick="dashboardManager.sortBy('${column}')"
+                    style="cursor: pointer; user-select: none;"
+                    title="Click para ordenar por ${label}">
+                    ${label} ${icon}
+                </th>`;
     }
 
     generateProjectRow(project) {
@@ -616,6 +839,16 @@ class DashboardManager {
         const desviacionColor = project.desvHoras < 0 ? 'text-success' :
                                project.desvHoras > 0 ? 'text-danger' : '';
 
+        // Indicadores Sí/No
+        const esAtrasado = project.estadoDesviacion === 'RETRASADO';
+        const atrasadoBadge = esAtrasado ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
+        const fueraPresupuesto = project.alertaPresupuesto === 'CRITICO';
+        const presupuestoBadge = fueraPresupuesto ? '<span class="badge bg-danger">SÍ</span>' : '<span class="badge bg-success">NO</span>';
+
+        // Mostrar fecha de registro tal como viene del Excel
+        const fechaRegistro = project.fecRegistroIniciativa || '-';
+
         return `
             <tr>
                 <td><span class="badge bg-secondary">${project.tipo}</span></td>
@@ -625,13 +858,20 @@ class DashboardManager {
                 <td>${project.pais}</td>
                 <td><small>${project.nombre.substring(0, 40)}${project.nombre.length > 40 ? '...' : ''}</small></td>
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
+                <td class="text-center"><small>${fechaRegistro}</small></td>
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
-                <td class="text-end ${desviacionColor}"><strong>${project.porcentajeDesviacion}</strong></td>
-                <td class="text-end">${project.porcentajeAvanceReal}</td>
-                <td class="text-end">${project.porcentajeAvanceEsperado}</td>
-                <td class="text-center" title="${project.alertaPresupuesto}">${alertaSemaforo}</td>
+                <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
+                <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
+                <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
+                <td class="text-end"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
+                <td class="text-end ${project.difAvanceVsPresupuesto > 0 ? 'text-danger' : project.difAvanceVsPresupuesto < 0 ? 'text-success' : ''}">
+                    <strong>${project.difAvanceVsPresupuesto.toFixed(2)}%</strong>
+                </td>
+                <td class="text-center">${atrasadoBadge}</td>
+                <td class="text-center">${presupuestoBadge}</td>
+                <td class="text-center"><small>${project.comentarios || '-'}</small></td>
             </tr>
         `;
     }
@@ -975,21 +1215,6 @@ class DashboardManager {
         });
 
         // Horas por Mes
-        const mesesData = {
-            'Ene': projects.reduce((sum, p) => sum + p.mes01, 0),
-            'Feb': projects.reduce((sum, p) => sum + p.mes02, 0),
-            'Mar': projects.reduce((sum, p) => sum + p.mes03, 0),
-            'Abr': projects.reduce((sum, p) => sum + p.mes04, 0),
-            'May': projects.reduce((sum, p) => sum + p.mes05, 0),
-            'Jun': projects.reduce((sum, p) => sum + p.mes06, 0),
-            'Jul': projects.reduce((sum, p) => sum + p.mes07, 0),
-            'Ago': projects.reduce((sum, p) => sum + p.mes08, 0),
-            'Sep': projects.reduce((sum, p) => sum + p.mes09, 0),
-            'Oct': projects.reduce((sum, p) => sum + p.mes10, 0),
-            'Nov': projects.reduce((sum, p) => sum + p.mes11, 0),
-            'Dic': projects.reduce((sum, p) => sum + p.mes12, 0)
-        };
-
         this.charts.meses = new Chart(document.getElementById('chartMeses'), {
             type: 'bar',
             data: {
