@@ -19,12 +19,12 @@ function initializeApp() {
     });
 }
 
-function handleLogin() {
+async function handleLogin() {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const errorDiv = document.getElementById('loginError');
 
-    const result = authManager.login(email, password);
+    const result = await authManager.login(email, password);
 
     if (result.success) {
         errorDiv.classList.add('d-none');
@@ -36,9 +36,9 @@ function handleLogin() {
     }
 }
 
-function logout() {
+async function logout() {
     if (confirm('¿Está seguro de cerrar sesión?')) {
-        authManager.logout();
+        await authManager.logout();
         showLogin();
     }
 }
@@ -244,7 +244,7 @@ async function handleFileSelect(event) {
     }
 }
 
-function renderManageAccessPage() {
+async function renderManageAccessPage() {
     // Verificar si el usuario es admin
     if (!authManager.isAdmin()) {
         const noAccessHtml = `
@@ -257,7 +257,7 @@ function renderManageAccessPage() {
         return;
     }
 
-    const users = authManager.getAllUsers();
+    const users = await authManager.getAllUsers();
     const currentUser = authManager.getCurrentUser();
 
     const manageAccessHtml = `
