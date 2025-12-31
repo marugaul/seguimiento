@@ -6,8 +6,8 @@ class AuthManager {
     constructor() {
         this.currentUser = null;
         this.storageKey = 'seguimiento_auth';
-        // IMPORTANTE: Actualizar esta URL después de desplegar en Railway
-        this.apiBaseUrl = 'https://TU-APP-RAILWAY.up.railway.app/api/auth';
+        // Conectado a Railway
+        this.apiBaseUrl = 'https://seguimiento-production-fa3a.up.railway.app/api/auth';
         this.checkCurrentUser();
     }
 
