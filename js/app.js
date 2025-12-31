@@ -358,16 +358,16 @@ async function renderManageAccessPage() {
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <code class="text-muted">${user.password}</code>
-                                                        <button class="btn btn-sm btn-outline-secondary ms-2"
-                                                                onclick="copyToClipboard('${user.password}')"
-                                                                title="Copiar contraseña">
-                                                            <i class="bi bi-clipboard"></i>
+                                                        <span class="text-muted">••••••••</span>
+                                                        <button class="btn btn-sm btn-outline-primary ms-2"
+                                                                onclick="showEditUserModal('${user.email}')"
+                                                                title="Cambiar contraseña">
+                                                            <i class="bi bi-key"></i>
                                                         </button>
                                                     </td>
                                                     <td>
                                                         <small class="text-muted">
-                                                            ${new Date(user.createdAt).toLocaleDateString('es')}
+                                                            ${user.created_at ? new Date(user.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}
                                                         </small>
                                                     </td>
                                                     <td class="text-center">
@@ -605,11 +605,11 @@ async function showAuditLogModal(email) {
                                         })}
                                     </small>
                                 </td>
-                                <td>${eventTypeLabels[log.eventType] || log.eventType}</td>
+                                <td>${eventTypeLabels[log.event_type] || log.event_type || 'Desconocido'}</td>
                                 <td>
                                     <small class="text-muted">
-                                        ${log.details.reason ? log.details.reason :
-                                          log.details.role ? `Rol: ${log.details.role}` : '-'}
+                                        ${log.details ? (log.details.reason ? log.details.reason :
+                                          log.details.role ? `Rol: ${log.details.role}` : '-') : '-'}
                                     </small>
                                 </td>
                             </tr>
