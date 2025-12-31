@@ -469,7 +469,7 @@ async function renderManageAccessPage() {
     document.getElementById('manageAccessPage').innerHTML = manageAccessHtml;
 }
 
-function handleCreateUser(event) {
+async function handleCreateUser(event) {
     event.preventDefault();
 
     const userData = {
@@ -479,19 +479,19 @@ function handleCreateUser(event) {
         role: document.getElementById('newUserRole').value
     };
 
-    const result = authManager.createUser(userData);
+    const result = await authManager.createUser(userData);
 
     if (result.success) {
-        showToast(result.message, 'success');
+        showToast(result.message || 'Usuario creado exitosamente', 'success');
         document.getElementById('createUserForm').reset();
-        renderManageAccessPage();
+        await renderManageAccessPage();
     } else {
-        showToast(result.message, 'error');
+        showToast(result.message || 'Error al crear usuario', 'error');
     }
 }
 
-function showEditUserModal(email) {
-    const users = authManager.getAllUsers();
+async function showEditUserModal(email) {
+    const users = await authManager.getAllUsers();
     const user = users.find(u => u.email === email);
 
     if (!user) {
@@ -508,7 +508,7 @@ function showEditUserModal(email) {
     modal.show();
 }
 
-function handleUpdateUser() {
+async function handleUpdateUser() {
     const email = document.getElementById('editUserEmail').value;
     const updates = {
         name: document.getElementById('editUserName').value,
@@ -520,27 +520,27 @@ function handleUpdateUser() {
         updates.password = newPassword;
     }
 
-    const result = authManager.updateUser(email, updates);
+    const result = await authManager.updateUser(email, updates);
 
     if (result.success) {
-        showToast(result.message, 'success');
+        showToast(result.message || 'Usuario actualizado exitosamente', 'success');
         const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
         modal.hide();
-        renderManageAccessPage();
+        await renderManageAccessPage();
     } else {
-        showToast(result.message, 'error');
+        showToast(result.message || 'Error al actualizar usuario', 'error');
     }
 }
 
-function handleDeleteUser(email) {
+async function handleDeleteUser(email) {
     if (confirm(`¿Está seguro de eliminar el usuario ${email}?\n\nEsta acción no se puede deshacer.`)) {
-        const result = authManager.deleteUser(email);
+        const result = await authManager.deleteUser(email);
 
         if (result.success) {
-            showToast(result.message, 'success');
-            renderManageAccessPage();
+            showToast(result.message || 'Usuario eliminado exitosamente', 'success');
+            await renderManageAccessPage();
         } else {
-            showToast(result.message, 'error');
+            showToast(result.message || 'Error al eliminar usuario', 'error');
         }
     }
 }
@@ -553,15 +553,15 @@ function copyToClipboard(text) {
     });
 }
 
-function showAuditLogModal(email) {
+async function showAuditLogModal(email) {
     if (!authManager.isAdmin()) {
         showToast('Solo los administradores pueden ver la bitácora', 'error');
         return;
     }
 
-    const users = authManager.getAllUsers();
+    const users = await authManager.getAllUsers();
     const user = users.find(u => u.email === email);
-    const logs = authManager.getAuditLogs(email);
+    const logs = await authManager.getAuditLogs(email);
 
     const eventTypeLabels = {
         'login': '<span class="badge bg-success">Ingreso</span>',
