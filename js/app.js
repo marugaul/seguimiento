@@ -53,6 +53,16 @@ function showApp() {
     document.getElementById('appScreen').classList.remove('d-none');
     const user = authManager.getCurrentUser();
     document.getElementById('currentUser').textContent = user.name || user.email || user;
+
+    // Ocultar menú "Gestionar Accesos" para usuarios no-admin
+    const manageAccessMenuItem = document.getElementById('manageAccessMenuItem');
+    if (manageAccessMenuItem) {
+        if (authManager.isAdmin()) {
+            manageAccessMenuItem.classList.remove('d-none');
+        } else {
+            manageAccessMenuItem.classList.add('d-none');
+        }
+    }
 }
 
 function showPage(pageName) {
