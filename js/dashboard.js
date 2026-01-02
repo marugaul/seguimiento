@@ -69,8 +69,8 @@ class DashboardManager {
                 }
             }
 
-            // CALCULAR HRS EST. = ESTIMACION + CONTROL CAMBIO (columnas Excel)
-            project.totalEstimacion = (project.estimacion || 0) + (project.controlCambio || 0);
+            // HRS EST. = Usar TOTAL ESTIMACIÓN directamente del Excel (ya viene calculada)
+            // No se recalcula, se usa el valor que viene del Excel
 
             // DESV. HRS = TOTAL DISPONIBLE (columna Excel)
             project.desvHoras = project.totalDisponible || 0;
