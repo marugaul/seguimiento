@@ -69,8 +69,18 @@ class DashboardManager {
                 }
             }
 
+            // CALCULAR HRS EST. = ESTIMACION + CONTROL CAMBIO (columnas Excel)
+            project.totalEstimacion = (project.estimacion || 0) + (project.controlCambio || 0);
+
+            // DESV. HRS = TOTAL DISPONIBLE (columna Excel)
+            project.desvHoras = project.totalDisponible || 0;
+
+            // % DESV. = (TOTAL DISPONIBLE / TOTAL REGISTRADO) * 100
+            project.porcentajeDesviacion = project.totalRegistrado > 0 ?
+                (project.totalDisponible / project.totalRegistrado) * 100 : 0;
+
             // Validar presupuesto basado en consumo real vs estimado
-            const presupuestoPlaneado = project.estimacion + project.controlCambio;
+            const presupuestoPlaneado = project.totalEstimacion;
             const horasConsumidas = project.totalRegistrado;
 
             // Calcular porcentaje de consumo
@@ -98,11 +108,10 @@ class DashboardManager {
             project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
             project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
 
-            // Calcular % Presupuesto Usado: (Hrs Registradas / Hrs Estimadas) * 100
-            project.porcentajePresupuestoUsado = project.totalEstimacion > 0 ?
-                (project.totalRegistrado / project.totalEstimacion) * 100 : 0;
+            // PRESUP. USADO = % AVANCE HORAS (columna Excel)
+            project.porcentajePresupuestoUsado = project.avanceHorasNumerico;
 
-            // Calcular Diferencia Avance vs Presupuesto: % Presupuesto Usado - % Avance Real
+            // DIF. AVANCE VS PRESUP. = Presup. Usado - Avance Real
             project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
 
             // Determinar si está desviado (más de 10% de diferencia)
@@ -836,8 +845,14 @@ class DashboardManager {
         const alertaSemaforo = project.alertaPresupuesto === 'CRITICO' ? '🔴' :
                               project.alertaPresupuesto === 'OK' ? '🟢' : '🟡';
 
-        const desviacionColor = project.desvHoras < 0 ? 'text-success' :
-                               project.desvHoras > 0 ? 'text-danger' : '';
+        // Desv. hrs: ROJO si negativo (excedido), VERDE si positivo (disponible)
+        const desviacionColor = project.desvHoras < 0 ? 'text-danger' :
+                               project.desvHoras > 0 ? 'text-success' : '';
+
+        // Presup. usado: ROJO si ≥100%, AMARILLO si 70-99%, VERDE si <70%
+        const presupUsado = project.porcentajePresupuestoUsado;
+        const presupUsadoColor = presupUsado >= 100 ? 'text-danger' :
+                                presupUsado >= 70 ? 'text-warning' : 'text-success';
 
         // Indicadores Sí/No
         const esAtrasado = project.estadoDesviacion === 'RETRASADO';
@@ -865,7 +880,7 @@ class DashboardManager {
                 <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
                 <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
                 <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
-                <td class="text-end"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
+                <td class="text-end ${presupUsadoColor}"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
                 <td class="text-end ${project.difAvanceVsPresupuesto > 0 ? 'text-danger' : project.difAvanceVsPresupuesto < 0 ? 'text-success' : ''}">
                     <strong>${project.difAvanceVsPresupuesto.toFixed(2)}%</strong>
                 </td>
