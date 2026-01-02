@@ -107,10 +107,14 @@ class DashboardManager {
             // Parsear porcentajes para comparación
             project.avanceRealNumerico = this.parsePercentage(project.porcentajeAvanceReal);
             project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
-            project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
 
-            // PRESUP. USADO = % AVANCE HORAS (columna Excel)
-            project.porcentajePresupuestoUsado = project.avanceHorasNumerico;
+            // PRESUP. USADO = % AVANCE HORAS directo del Excel (sin transformación parsePercentage)
+            // Solo remover símbolo % y convertir a número
+            const avanceHorasStr = String(project.porcentajeAvanceHoras || '0')
+                .replace('%', '')
+                .replace(',', '.')
+                .trim();
+            project.porcentajePresupuestoUsado = parseFloat(avanceHorasStr) || 0;
 
             // DIF. AVANCE VS PRESUP. = Presup. Usado - Avance Real
             project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
