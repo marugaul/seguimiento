@@ -97,7 +97,17 @@ class ExcelProcessor {
                 mes09: this.getNumericValue(row[23]),
                 mes10: this.getNumericValue(row[24]),
                 mes11: this.getNumericValue(row[25]),
-                mes12: this.getNumericValue(row[26]),
+                mes12: 0, // TODO: Verificar índice correcto
+                estimacion: 0, // TODO: Verificar índice correcto
+                controlCambio: 0, // TODO: Verificar índice correcto
+                totalEstimacion: 0, // TODO: Verificar índice correcto
+                totalRegistrado: 0, // TODO: Verificar índice correcto
+                totalDisponible: 0, // TODO: Verificar índice correcto
+                porcentajeAvanceHoras: '', // TODO: Verificar índice correcto
+                porcentajeAvanceReal: '', // TODO: Verificar índice correcto
+                porcentajeAvanceEsperado: '', // TODO: Verificar índice correcto
+                desvHoras: 0, // TODO: Verificar índice correcto
+                porcentajeDesviacion: '', // TODO: Verificar índice correcto
                 fecRegistroIniciativa: this.getRawStringValue(row[26]), // Índice 26: FEC. REGISTRO INICIATIVA
                 fecIniFs: this.getCellValue(row[27]),                    // Índice 27: FEC. INI. FS
                 fecFinFs: this.getCellValue(row[28]),                    // Índice 28: FEC. FIN. FS
