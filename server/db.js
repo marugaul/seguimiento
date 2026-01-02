@@ -61,7 +61,7 @@ function createDefaultAdmin() {
         } else if (!row) {
             const hashedPassword = await bcrypt.hash('Admin2024!', 10);
             db.run(
-                'INSERT INTO users (email, password, role, name) VALUES (?, ?, ?, ?)',
+                'INSERT INTO users (email, password, role, name, created_at, updated_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'-6 hours\'), datetime(\'now\', \'-6 hours\'))',
                 ['admin@seguimiento.com', hashedPassword, 'admin', 'Administrador'],
                 (err) => {
                     if (err) {

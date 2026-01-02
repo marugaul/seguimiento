@@ -7,8 +7,9 @@ const router = express.Router();
 // Helper function to log events
 function logEvent(email, eventType, details = {}) {
     const detailsStr = JSON.stringify(details);
+    // Costa Rica es UTC-6, usar datetime('now', '-6 hours')
     db.run(
-        'INSERT INTO audit_logs (email, event_type, details) VALUES (?, ?, ?)',
+        'INSERT INTO audit_logs (email, event_type, details, timestamp) VALUES (?, ?, ?, datetime(\'now\', \'-6 hours\'))',
         [email, eventType, detailsStr],
         (err) => {
             if (err) console.error('Error logging event:', err.message);
@@ -98,7 +99,7 @@ router.post('/users', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     db.run(
-        'INSERT INTO users (email, password, role, name) VALUES (?, ?, ?, ?)',
+        'INSERT INTO users (email, password, role, name, created_at, updated_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'-6 hours\'), datetime(\'now\', \'-6 hours\'))',
         [emailLower, hashedPassword, role || 'user', name],
         function(err) {
             if (err) {
@@ -139,7 +140,7 @@ router.put('/users/:email', async (req, res) => {
         values.push(role);
     }
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
+    updates.push('updated_at = datetime(\'now\', \'-6 hours\')');
     values.push(email.toLowerCase());
 
     if (updates.length === 1) { // Only updated_at
