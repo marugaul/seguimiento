@@ -120,7 +120,16 @@ class ExcelProcessor {
                 // Totales
                 estimacion: this.getNumericValue(row[getCol(['ESTIMACIÓN', 'ESTIMACION'])]),
                 controlCambio: this.getNumericValue(row[getCol(['CONTROL CAMBIO', 'CONTROLCAMBIO', 'CC'])]),
-                totalEstimacion: this.getNumericValue(row[getCol(['TOTAL ESTIMACIÓN', 'TOTALESTIMACION', 'TOTAL ESTIMACION'])]),
+                totalEstimacion: (() => {
+                    const colIndex = getCol(['TOTAL ESTIMACIÓN', 'TOTALESTIMACION', 'TOTAL ESTIMACION']);
+                    const rawValue = row[colIndex];
+                    const numValue = this.getNumericValue(rawValue);
+                    // DEBUG: Mostrar primeros 3 valores
+                    if (i <= 3) {
+                        console.log(`🔍 Fila ${i} - TOTAL ESTIMACIÓN [${colIndex}]: raw="${rawValue}" (type: ${typeof rawValue}) | parsed=${numValue}`);
+                    }
+                    return numValue;
+                })(),
                 totalRegistrado: this.getNumericValue(row[getCol(['TOTAL REGISTRADO', 'TOTALREGISTRADO'])]),
                 totalDisponible: this.getNumericValue(row[getCol(['TOTAL DISPONIBLE', 'TOTALDISPONIBLE'])]),
 
