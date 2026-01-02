@@ -136,10 +136,20 @@ class ExcelProcessor {
     getRawStringValue(cell) {
         if (cell === undefined || cell === null || cell === 'nan') return '';
 
-        // Si Excel convirtió a Date, retornar vacío en lugar de convertirlo
-        // Esto evita fechas incorrectas como "18/05/1911"
+        // Si Excel convirtió a Date, verificar si la fecha es válida
         if (cell instanceof Date) {
-            return '';
+            const year = cell.getFullYear();
+
+            // Si el año es muy antiguo (< 1950) o muy futuro (> 2100),
+            // probablemente es error de conversión - mostrar vacío
+            if (year < 1950 || year > 2100) {
+                return '';
+            }
+
+            // Si la fecha parece válida, mostrarla en formato DD/MM/YYYY
+            const day = String(cell.getDate()).padStart(2, '0');
+            const month = String(cell.getMonth() + 1).padStart(2, '0');
+            return `${day}/${month}/${year}`;
         }
 
         // Si es texto o número, retornarlo como string sin modificar
