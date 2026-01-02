@@ -116,6 +116,11 @@ class DashboardManager {
                 .trim();
             project.porcentajePresupuestoUsado = parseFloat(avanceHorasStr) || 0;
 
+            // DEBUG: Mostrar primeros 3 valores de % AVANCE HORAS
+            if (this.projects.indexOf(project) < 3) {
+                console.log(`🔍 % AVANCE HORAS: raw="${project.porcentajeAvanceHoras}" | string="${avanceHorasStr}" | parsed=${project.porcentajePresupuestoUsado}`);
+            }
+
             // DIF. AVANCE VS PRESUP. = Presup. Usado - Avance Real
             project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
 
