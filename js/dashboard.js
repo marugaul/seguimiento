@@ -854,10 +854,10 @@ class DashboardManager {
         const desviacionColor = project.desvHoras < 0 ? 'text-danger' :
                                project.desvHoras > 0 ? 'text-success' : '';
 
-        // Presup. usado: ROJO si ≥100%, AMARILLO si 70-99%, VERDE si <70%
+        // Presup. usado: ROJO si ≥100%, AMARILLO si 90-99% (falta 10%), VERDE si <90% (más de 10% disponible)
         const presupUsado = project.porcentajePresupuestoUsado;
         const presupUsadoColor = presupUsado >= 100 ? 'text-danger' :
-                                presupUsado >= 70 ? 'text-warning' : 'text-success';
+                                presupUsado >= 90 ? 'text-warning' : 'text-success';
 
         // Indicadores Sí/No
         const esAtrasado = project.estadoDesviacion === 'RETRASADO';
