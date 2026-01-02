@@ -1,14 +1,27 @@
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
 // Create database connection
-const dbPath = path.join(__dirname, 'seguimiento.db');
+// Use persistent volume path in production (Railway), local path in development
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+const dataDir = isProduction ? '/data' : path.join(__dirname, 'data');
+
+// Create data directory if it doesn't exist
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log(`Created data directory: ${dataDir}`);
+}
+
+const dbPath = path.join(dataDir, 'database.db');
+console.log(`Database path: ${dbPath}`);
+
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Error opening database:', err.message);
     } else {
-        console.log('Connected to SQLite database');
+        console.log('Connected to SQLite database at:', dbPath);
         initDatabase();
     }
 });
