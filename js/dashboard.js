@@ -73,12 +73,12 @@ class DashboardManager {
             // El valor ya viene correcto del Excel (ESTIMACION + CONTROL CAMBIO)
             // No se recalcula, getNumericValue() ahora maneja correctamente el formato con comas
 
-            // DESV. HRS = TOTAL DISPONIBLE (columna Excel)
-            project.desvHoras = project.totalDisponible || 0;
+            // DESV. HRS = Usar columna DESVIACIÓN HORAS del Excel (no TOTAL DISPONIBLE)
+            // Ya viene calculada correctamente en el Excel
 
-            // % DESV. = (TOTAL DISPONIBLE / TOTAL REGISTRADO) * 100
-            project.porcentajeDesviacion = project.totalRegistrado > 0 ?
-                (project.totalDisponible / project.totalRegistrado) * 100 : 0;
+            // % DESV. = (DESV. HRS / HRS. ESTIMADAS) * 100
+            project.porcentajeDesviacion = project.totalEstimacion > 0 ?
+                (project.desvHoras / project.totalEstimacion) * 100 : 0;
 
             // Validar presupuesto basado en consumo real vs estimado
             const presupuestoPlaneado = project.totalEstimacion;
