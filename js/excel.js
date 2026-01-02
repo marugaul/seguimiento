@@ -50,16 +50,17 @@ class ExcelProcessor {
     parseProjects(data) {
         const projects = [];
 
-        // DEBUG: Mostrar encabezados y sus índices
+        // DEBUG: Mostrar TODOS los encabezados y sus índices
         if (data.length > 0) {
-            console.log('=== ENCABEZADOS DEL EXCEL ===');
+            console.log('=== TODOS LOS ENCABEZADOS DEL EXCEL ===');
             const headers = data[0];
             headers.forEach((header, index) => {
-                if (header && String(header).toUpperCase().includes('FEC')) {
-                    console.log(`📅 Índice ${index}: "${header}"`);
-                }
+                const emoji = String(header).toUpperCase().includes('FEC') ? '📅' :
+                             String(header).toUpperCase().includes('MES') ? '📆' :
+                             String(header).toUpperCase().includes('TOTAL') ? '💰' : '📋';
+                console.log(`${emoji} Índice ${index}: "${header}"`);
             });
-            console.log(`Total columnas: ${headers.length}`);
+            console.log(`\n📊 Total columnas: ${headers.length}`);
         }
 
         // Saltar la primera fila (encabezados)
@@ -97,30 +98,20 @@ class ExcelProcessor {
                 mes10: this.getNumericValue(row[24]),
                 mes11: this.getNumericValue(row[25]),
                 mes12: this.getNumericValue(row[26]),
-                estimacion: this.getNumericValue(row[27]),
-                controlCambio: this.getNumericValue(row[28]),
-                totalEstimacion: this.getNumericValue(row[29]),
-                totalRegistrado: this.getNumericValue(row[30]),
-                totalDisponible: this.getNumericValue(row[31]),
-                porcentajeAvanceHoras: this.getCellValue(row[32]),
-                porcentajeAvanceReal: this.getCellValue(row[33]),
-                porcentajeAvanceEsperado: this.getCellValue(row[34]),
-                desvHoras: this.getNumericValue(row[35]),
-                porcentajeDesviacion: this.getCellValue(row[36]),
-                fecRegistroIniciativa: this.getRawStringValue(row[37]), // NO convertir fechas, dejar como texto
-                fecIniFs: this.getCellValue(row[38]),
-                fecFinFs: this.getCellValue(row[39]),
-                fecIniConstruccion: this.getCellValue(row[40]),
-                fecFinConstruccion: this.getCellValue(row[41]),
-                fecIniQa: this.getCellValue(row[42]),
-                fecFinQa: this.getCellValue(row[43]),
-                fecIniCertifica: this.getCellValue(row[44]),
-                fecFinCertifica: this.getCellValue(row[45]),
-                fecPuestaProd: this.getCellValue(row[46]),
-                fecFinPostProd: this.getCellValue(row[47]),
-                fecLanzamiento: this.getCellValue(row[48]),
-                fecCierreIniciativa: this.getCellValue(row[49]),
-                comentarios: this.getCellValue(row[50])
+                fecRegistroIniciativa: this.getRawStringValue(row[26]), // Índice 26: FEC. REGISTRO INICIATIVA
+                fecIniFs: this.getCellValue(row[27]),                    // Índice 27: FEC. INI. FS
+                fecFinFs: this.getCellValue(row[28]),                    // Índice 28: FEC. FIN. FS
+                fecIniConstruccion: this.getCellValue(row[29]),          // Índice 29: FEC. INI. CONSTRUCCIÓN
+                fecFinConstruccion: this.getCellValue(row[30]),          // Índice 30: FEC. FIN. CONSTRUCCIÓN
+                fecIniQa: this.getCellValue(row[31]),                    // Índice 31: FEC. INI. QA
+                fecFinQa: this.getCellValue(row[32]),                    // Índice 32: FEC. FIN. QA
+                fecIniCertifica: this.getCellValue(row[33]),             // Índice 33: FEC. INI. CERTIFICA
+                fecFinCertifica: this.getCellValue(row[34]),             // Índice 34: FEC. FIN. CERTIFICA
+                fecPuestaProd: this.getCellValue(row[35]),               // Índice 35: FEC. PUESTA PROD.
+                fecFinPostProd: this.getCellValue(row[36]),              // Índice 36: FEC. FIN. POST PROD.
+                fecLanzamiento: this.getCellValue(row[37]),              // Índice 37: FEC. LANZAMIENTO
+                fecCierreIniciativa: this.getCellValue(row[38]),         // Índice 38: FEC. CIERRE INICIATIVA
+                comentarios: this.getCellValue(row[39])                  // Índice 39: COMENTARIOS
             };
 
             projects.push(project);
