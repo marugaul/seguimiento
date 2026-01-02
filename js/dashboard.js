@@ -69,14 +69,9 @@ class DashboardManager {
                 }
             }
 
-            // HRS EST. = ESTIMACION + CONTROL CAMBIO, o TOTAL ESTIMACIÓN si las anteriores están vacías
-            // Intentar calcular desde columnas base, si no usar TOTAL ESTIMACIÓN directamente
-            const estimacionCalculada = (project.estimacion || 0) + (project.controlCambio || 0);
-            if (estimacionCalculada > 0) {
-                project.totalEstimacion = estimacionCalculada;
-            }
-            // Si la calculada es 0, mantener el valor de TOTAL ESTIMACIÓN que viene del Excel
-            // (no sobreescribir con 0)
+            // HRS EST. = Usar TOTAL ESTIMACIÓN directamente del Excel
+            // El valor ya viene correcto del Excel (ESTIMACION + CONTROL CAMBIO)
+            // No se recalcula, getNumericValue() ahora maneja correctamente el formato con comas
 
             // DESV. HRS = TOTAL DISPONIBLE (columna Excel)
             project.desvHoras = project.totalDisponible || 0;

@@ -196,7 +196,15 @@ class ExcelProcessor {
 
     getNumericValue(cell) {
         if (cell === undefined || cell === null || cell === '') return 0;
-        const num = parseFloat(cell);
+
+        // Si es número, retornarlo directamente
+        if (typeof cell === 'number') return cell;
+
+        // Si es string, limpiar formato (eliminar comas de miles)
+        // Ej: "2,051.16" -> "2051.16"
+        let cleaned = String(cell).replace(/,/g, '');
+
+        const num = parseFloat(cleaned);
         return isNaN(num) ? 0 : num;
     }
 
