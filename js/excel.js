@@ -95,7 +95,7 @@ class ExcelProcessor {
                 porcentajeAvanceEsperado: this.getCellValue(row[34]),
                 desvHoras: this.getNumericValue(row[35]),
                 porcentajeDesviacion: this.getCellValue(row[36]),
-                fecRegistroIniciativa: this.getCellValue(row[37]),
+                fecRegistroIniciativa: this.getRawStringValue(row[37]), // NO convertir fechas, dejar como texto
                 fecIniFs: this.getCellValue(row[38]),
                 fecFinFs: this.getCellValue(row[39]),
                 fecIniConstruccion: this.getCellValue(row[40]),
@@ -129,6 +129,20 @@ class ExcelProcessor {
             return `${day}/${month}/${year}`;
         }
 
+        return String(cell).trim();
+    }
+
+    // Obtener valor RAW sin conversión de fechas (para campos que deben quedar como texto)
+    getRawStringValue(cell) {
+        if (cell === undefined || cell === null || cell === 'nan') return '';
+
+        // Si Excel convirtió a Date, retornar vacío en lugar de convertirlo
+        // Esto evita fechas incorrectas como "18/05/1911"
+        if (cell instanceof Date) {
+            return '';
+        }
+
+        // Si es texto o número, retornarlo como string sin modificar
         return String(cell).trim();
     }
 
