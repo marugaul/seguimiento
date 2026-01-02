@@ -4,9 +4,11 @@ const path = require('path');
 const fs = require('fs');
 
 // Create database connection
-// Use persistent volume path in production (Railway), local path in development
+// Use environment variable or default paths
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
-const dataDir = isProduction ? '/data' : path.join(__dirname, 'data');
+// Railway: try /app/data (might persist), fallback to /data, then local
+const dataDir = process.env.DATABASE_PATH ||
+                (isProduction ? path.join('/app', 'data') : path.join(__dirname, 'data'));
 
 // Create data directory if it doesn't exist
 if (!fs.existsSync(dataDir)) {
