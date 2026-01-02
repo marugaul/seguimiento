@@ -119,6 +119,16 @@ class ExcelProcessor {
 
     getCellValue(cell) {
         if (cell === undefined || cell === null || cell === 'nan') return '';
+
+        // Si es un objeto Date de JavaScript (Excel a veces convierte fechas),
+        // convertirlo a formato simple DD/MM/YYYY en lugar del formato largo
+        if (cell instanceof Date) {
+            const day = String(cell.getDate()).padStart(2, '0');
+            const month = String(cell.getMonth() + 1).padStart(2, '0');
+            const year = cell.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
         return String(cell).trim();
     }
 
