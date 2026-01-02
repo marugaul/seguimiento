@@ -50,6 +50,18 @@ class ExcelProcessor {
     parseProjects(data) {
         const projects = [];
 
+        // DEBUG: Mostrar encabezados y sus índices
+        if (data.length > 0) {
+            console.log('=== ENCABEZADOS DEL EXCEL ===');
+            const headers = data[0];
+            headers.forEach((header, index) => {
+                if (header && String(header).toUpperCase().includes('FEC')) {
+                    console.log(`📅 Índice ${index}: "${header}"`);
+                }
+            });
+            console.log(`Total columnas: ${headers.length}`);
+        }
+
         // Saltar la primera fila (encabezados)
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
