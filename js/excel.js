@@ -58,7 +58,13 @@ class ExcelProcessor {
 
         headers.forEach((header, index) => {
             if (!header) return;
-            const normalized = String(header).trim().toUpperCase();
+
+            // Decodificar HTML entities (ej: &OACUTE; → Ó, &IACUTE; → Í)
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = String(header);
+            const decoded = (tempDiv.textContent || tempDiv.innerText || String(header));
+
+            const normalized = decoded.trim().toUpperCase();
             columnMap[normalized] = index;
         });
 
