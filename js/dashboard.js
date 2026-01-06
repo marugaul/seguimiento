@@ -4,6 +4,7 @@ class DashboardManager {
         this.projects = [];
         this.filteredProjects = [];
         this.charts = {};
+        this.tableZoom = 100; // Nivel de zoom de la tabla (porcentaje)
         this.filters = {
             lider: '',
             pais: '',
@@ -450,6 +451,8 @@ class DashboardManager {
         const dashboardHtml = this.generateDashboardHTML();
         document.getElementById('dashboardPage').innerHTML = dashboardHtml;
         this.renderCharts();
+        // Aplicar zoom después de renderizar
+        setTimeout(() => this.applyTableZoom(), 100);
     }
 
     generateDashboardHTML() {
@@ -807,10 +810,23 @@ class DashboardManager {
             <!-- Tabla de proyectos mejorada -->
             <div class="card" id="projectsTable">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
-                        ${this.getActiveFiltersHTML()}
-                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="mb-0">
+                            <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
+                            ${this.getActiveFiltersHTML()}
+                        </h5>
+                        <div class="btn-group btn-group-sm ms-3" role="group" aria-label="Zoom controls">
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.zoomOut()" title="Alejar zoom">
+                                <i class="bi bi-zoom-out"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.resetZoom()" title="Restablecer zoom">
+                                <span id="zoomIndicator">100%</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.zoomIn()" title="Acercar zoom">
+                                <i class="bi bi-zoom-in"></i>
+                            </button>
+                        </div>
+                    </div>
                     ${Object.values(this.filters).some(f => f) ?
                         '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
                         : ''}
@@ -1282,6 +1298,37 @@ class DashboardManager {
                 scales: { y: { beginAtZero: true } }
             }
         });
+    }
+
+    zoomIn() {
+        if (this.tableZoom < 150) {
+            this.tableZoom += 10;
+            this.applyTableZoom();
+        }
+    }
+
+    zoomOut() {
+        if (this.tableZoom > 60) {
+            this.tableZoom -= 10;
+            this.applyTableZoom();
+        }
+    }
+
+    resetZoom() {
+        this.tableZoom = 100;
+        this.applyTableZoom();
+    }
+
+    applyTableZoom() {
+        const table = document.querySelector('#projectsTable table');
+        if (table) {
+            table.style.fontSize = `${this.tableZoom}%`;
+        }
+        // Actualizar el indicador de zoom
+        const zoomIndicator = document.getElementById('zoomIndicator');
+        if (zoomIndicator) {
+            zoomIndicator.textContent = `${this.tableZoom}%`;
+        }
     }
 
     groupBy(array, field) {
