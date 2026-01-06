@@ -832,9 +832,9 @@ class DashboardManager {
                         : ''}
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
+                    <div class="table-responsive" style="max-height: 600px; overflow-x: auto; overflow-y: auto;">
                         <table class="table table-striped table-hover table-sm">
-                            <thead class="table-dark">
+                            <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                                 <tr>
                                     ${this.generateSortableHeader('tipo', 'Tipo')}
                                     ${this.generateSortableHeader('categoria', 'Categoría')}
