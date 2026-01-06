@@ -11,6 +11,8 @@ class DashboardManager {
             etapa: '',
             tipo: '',           // LOCAL o REGIONAL
             categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
+            producto: '',       // PRODUCTO
+            area: '',           // ÁREA
             alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
             estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
@@ -211,6 +213,8 @@ class DashboardManager {
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
             if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
+            if (this.filters.producto && project.producto !== this.filters.producto) return false;
+            if (this.filters.area && project.area !== this.filters.area) return false;
             if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
             if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
@@ -279,6 +283,8 @@ class DashboardManager {
             etapa: '',
             tipo: '',
             categoria: '',
+            producto: '',
+            area: '',
             alertaPresupuesto: '',
             estadoDesviacion: ''
         };
@@ -301,7 +307,9 @@ class DashboardManager {
             pais: 'País',
             estado: 'Estado Proyecto',
             etapa: 'Etapa',
-            tipo: 'Tipo'
+            tipo: 'Tipo',
+            producto: 'Producto',
+            area: 'Área'
         };
 
         for (const [key, value] of Object.entries(this.filters)) {
@@ -452,6 +460,8 @@ class DashboardManager {
         const estados = this.getUniqueValues('estado');
         const etapas = this.getUniqueValues('etapa');
         const tipos = this.getUniqueValues('tipo');
+        const productos = this.getUniqueValues('producto');
+        const areas = this.getUniqueValues('area');
 
         return `
             <div class="row mb-4">
@@ -594,6 +604,22 @@ class DashboardManager {
                             <select id="filterEtapa" class="form-select" onchange="dashboardManager.setFilter('etapa', this.value)">
                                 <option value="">Todas</option>
                                 ${etapas.map(e => `<option value="${e}" ${this.filters.etapa === e ? 'selected' : ''}>${e}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Producto</label>
+                            <select id="filterProducto" class="form-select" onchange="dashboardManager.setFilter('producto', this.value)">
+                                <option value="">Todos</option>
+                                ${productos.map(p => `<option value="${p}" ${this.filters.producto === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Área</label>
+                            <select id="filterArea" class="form-select" onchange="dashboardManager.setFilter('area', this.value)">
+                                <option value="">Todas</option>
+                                ${areas.map(a => `<option value="${a}" ${this.filters.area === a ? 'selected' : ''}>${a}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -799,6 +825,8 @@ class DashboardManager {
                                     ${this.generateSortableHeader('numero', 'Número')}
                                     ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
                                     ${this.generateSortableHeader('pais', 'País')}
+                                    ${this.generateSortableHeader('producto', 'Producto')}
+                                    ${this.generateSortableHeader('area', 'Área')}
                                     ${this.generateSortableHeader('nombre', 'Nombre')}
                                     ${this.generateSortableHeader('estado', 'Estado')}
                                     ${this.generateSortableHeader('fecRegistroIniciativa', 'Fecha Registro', 'text-center')}
@@ -877,6 +905,8 @@ class DashboardManager {
                 <td><small>${project.numero}</small></td>
                 <td><strong>${project.nombreLt}</strong></td>
                 <td>${project.pais}</td>
+                <td><small>${project.producto || '-'}</small></td>
+                <td><small>${project.area || '-'}</small></td>
                 <td><small>${project.nombre.substring(0, 40)}${project.nombre.length > 40 ? '...' : ''}</small></td>
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
                 <td class="text-center"><small>${fechaRegistro}</small></td>
