@@ -14,6 +14,7 @@ class DashboardManager {
             categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
             producto: '',       // PRODUCTO
             area: '',           // ÁREA
+            numero: '',         // NÚMERO (búsqueda parcial)
             alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
             estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
@@ -216,6 +217,8 @@ class DashboardManager {
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
             if (this.filters.producto && project.producto !== this.filters.producto) return false;
             if (this.filters.area && project.area !== this.filters.area) return false;
+            // Búsqueda parcial para número (LIKE)
+            if (this.filters.numero && !String(project.numero || '').toUpperCase().includes(this.filters.numero.toUpperCase())) return false;
             if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
             if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
@@ -286,6 +289,7 @@ class DashboardManager {
             categoria: '',
             producto: '',
             area: '',
+            numero: '',
             alertaPresupuesto: '',
             estadoDesviacion: ''
         };
@@ -310,7 +314,8 @@ class DashboardManager {
             etapa: 'Etapa',
             tipo: 'Tipo',
             producto: 'Producto',
-            area: 'Área'
+            area: 'Área',
+            numero: 'Número'
         };
 
         for (const [key, value] of Object.entries(this.filters)) {
@@ -624,6 +629,15 @@ class DashboardManager {
                                 <option value="">Todas</option>
                                 ${areas.map(a => `<option value="${a}" ${this.filters.area === a ? 'selected' : ''}>${a}</option>`).join('')}
                             </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Buscar Número (Proyecto/Req/Soporte)</label>
+                            <input type="text"
+                                   id="filterNumero"
+                                   class="form-control"
+                                   placeholder="Ej: 161, PFCTI-161, INCRC-439..."
+                                   value="${this.filters.numero}"
+                                   onkeyup="dashboardManager.setFilter('numero', this.value)">
                         </div>
                     </div>
                     <div class="row mt-3">
