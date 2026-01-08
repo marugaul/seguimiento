@@ -630,14 +630,19 @@ class DashboardManager {
                                 ${areas.map(a => `<option value="${a}" ${this.filters.area === a ? 'selected' : ''}>${a}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label">Buscar Número (Proyecto/Req/Soporte)</label>
-                            <input type="text"
-                                   id="filterNumero"
-                                   class="form-control"
-                                   placeholder="Ej: 161, PFCTI-161, INCRC-439..."
-                                   value="${this.filters.numero}"
-                                   onkeyup="dashboardManager.setFilter('numero', this.value)">
+                            <div class="input-group">
+                                <input type="text"
+                                       id="filterNumero"
+                                       class="form-control"
+                                       placeholder="Ej: 161, PFCTI-161, INCRC-439..."
+                                       value="${this.filters.numero}"
+                                       onkeypress="if(event.key === 'Enter') { dashboardManager.setFilter('numero', document.getElementById('filterNumero').value); }">
+                                <button class="btn btn-primary" type="button" onclick="dashboardManager.setFilter('numero', document.getElementById('filterNumero').value)">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="row mt-3">
