@@ -885,6 +885,7 @@ class DashboardManager {
                                     ${this.generateSortableHeader('estado', 'Estado')}
                                     ${this.generateSortableHeader('fecRegistroIniciativa', 'Fecha Registro', 'text-center')}
                                     ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
+                                    ${this.generateSortableHeader('controlCambio', 'Control Cambio', 'text-end')}
                                     ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
                                     ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
                                     ${this.generateSortableHeader('porcentajeDesviacion', '% Desv.', 'text-end')}
@@ -965,6 +966,7 @@ class DashboardManager {
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
                 <td class="text-center"><small>${fechaRegistro}</small></td>
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
+                <td class="text-end">${(project.controlCambio || 0).toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
                 <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
