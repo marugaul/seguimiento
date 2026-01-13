@@ -15,6 +15,7 @@ class DashboardManager {
             producto: '',       // PRODUCTO
             area: '',           // ÁREA
             numero: '',         // NÚMERO (búsqueda parcial)
+            nombre: '',         // NOMBRE (búsqueda parcial)
             alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
             estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
@@ -219,6 +220,8 @@ class DashboardManager {
             if (this.filters.area && project.area !== this.filters.area) return false;
             // Búsqueda parcial para número (LIKE)
             if (this.filters.numero && !String(project.numero || '').toUpperCase().includes(this.filters.numero.toUpperCase())) return false;
+            // Búsqueda parcial para nombre (LIKE)
+            if (this.filters.nombre && !String(project.nombre || '').toUpperCase().includes(this.filters.nombre.toUpperCase())) return false;
             if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
             if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
@@ -290,6 +293,7 @@ class DashboardManager {
             producto: '',
             area: '',
             numero: '',
+            nombre: '',
             alertaPresupuesto: '',
             estadoDesviacion: ''
         };
@@ -315,7 +319,8 @@ class DashboardManager {
             tipo: 'Tipo',
             producto: 'Producto',
             area: 'Área',
-            numero: 'Número'
+            numero: 'Número',
+            nombre: 'Nombre'
         };
 
         for (const [key, value] of Object.entries(this.filters)) {
@@ -640,6 +645,20 @@ class DashboardManager {
                                        value="${this.filters.numero}"
                                        onkeypress="if(event.key === 'Enter') { dashboardManager.setFilter('numero', document.getElementById('filterNumero').value); }">
                                 <button class="btn btn-primary" type="button" onclick="dashboardManager.setFilter('numero', document.getElementById('filterNumero').value)">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Buscar por Nombre</label>
+                            <div class="input-group">
+                                <input type="text"
+                                       id="filterNombre"
+                                       class="form-control"
+                                       placeholder="Ej: TRAER FONDOS, DASHBOARD..."
+                                       value="${this.filters.nombre}"
+                                       onkeypress="if(event.key === 'Enter') { dashboardManager.setFilter('nombre', document.getElementById('filterNombre').value); }">
+                                <button class="btn btn-primary" type="button" onclick="dashboardManager.setFilter('nombre', document.getElementById('filterNombre').value)">
                                     <i class="bi bi-search"></i> Buscar
                                 </button>
                             </div>
