@@ -864,6 +864,9 @@ class DashboardManager {
                                 <i class="bi bi-zoom-in"></i>
                             </button>
                         </div>
+                        <button type="button" class="btn btn-success btn-sm ms-2" onclick="dashboardManager.exportToExcel()" title="Exportar a Excel">
+                            <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                        </button>
                     </div>
                     ${Object.values(this.filters).some(f => f) ?
                         '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
@@ -1369,6 +1372,74 @@ class DashboardManager {
         if (zoomIndicator) {
             zoomIndicator.textContent = `${this.tableZoom}%`;
         }
+    }
+
+    exportToExcel() {
+        // Preparar datos para exportar
+        const exportData = this.filteredProjects.map(project => ({
+            'Tipo': project.tipo,
+            'Categoría': project.categoria,
+            'Número': project.numero,
+            'Líder Técnico': project.nombreLt,
+            'País': project.pais,
+            'Producto': project.producto || '',
+            'Área': project.area || '',
+            'Nombre': project.nombre,
+            'Estado': project.estado,
+            'Fecha Registro': project.fecRegistroIniciativa || '',
+            'Hrs Est.': project.totalEstimacion,
+            'Control Cambio': project.controlCambio || 0,
+            'Hrs Reg.': project.totalRegistrado,
+            'Desv. Hrs': project.desvHoras,
+            '% Desv.': project.porcentajeDesviacion.toFixed(2),
+            '% Real': project.avanceRealNumerico.toFixed(2),
+            '% Esperado': project.avanceEsperadoNumerico.toFixed(2),
+            '% Presup. Usado': project.porcentajePresupuestoUsado.toFixed(2),
+            'Dif. Avance vs Presup.': project.difAvanceVsPresupuesto.toFixed(2),
+            '¿Atrasado?': project.estadoDesviacion === 'RETRASADO' ? 'SÍ' : 'NO',
+            '¿Fuera Presup.?': project.alertaPresupuesto === 'CRITICO' ? 'SÍ' : 'NO',
+            'Comentarios': project.comentarios || ''
+        }));
+
+        // Crear libro de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportData);
+
+        // Ajustar ancho de columnas
+        const colWidths = [
+            { wch: 10 },  // Tipo
+            { wch: 15 },  // Categoría
+            { wch: 20 },  // Número
+            { wch: 20 },  // Líder Técnico
+            { wch: 10 },  // País
+            { wch: 15 },  // Producto
+            { wch: 15 },  // Área
+            { wch: 50 },  // Nombre
+            { wch: 15 },  // Estado
+            { wch: 15 },  // Fecha Registro
+            { wch: 12 },  // Hrs Est.
+            { wch: 15 },  // Control Cambio
+            { wch: 12 },  // Hrs Reg.
+            { wch: 12 },  // Desv. Hrs
+            { wch: 12 },  // % Desv.
+            { wch: 12 },  // % Real
+            { wch: 12 },  // % Esperado
+            { wch: 15 },  // % Presup. Usado
+            { wch: 20 },  // Dif. Avance vs Presup.
+            { wch: 12 },  // ¿Atrasado?
+            { wch: 15 },  // ¿Fuera Presup.?
+            { wch: 30 }   // Comentarios
+        ];
+        ws['!cols'] = colWidths;
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Detalle Proyectos');
+
+        // Generar nombre de archivo con fecha
+        const now = new Date();
+        const filename = `Detalle_Proyectos_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.xlsx`;
+
+        // Descargar archivo
+        XLSX.writeFile(wb, filename);
     }
 
     groupBy(array, field) {
