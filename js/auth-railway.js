@@ -1,9 +1,13 @@
-// Gestión de Autenticación con API Backend
+// Gestión de Autenticación con API Backend - VERSIÓN RAILWAY
+// Este archivo es para PRUEBAS con Railway
+// NO reemplaza auth.js (que usa GitHub Pages)
+
 class AuthManager {
     constructor() {
         this.currentUser = null;
         this.storageKey = 'seguimiento_auth';
-        this.apiBaseUrl = 'http://localhost:3000/api/auth'; // Cambiar en producción
+        // Conectado a Railway
+        this.apiBaseUrl = 'https://seguimiento-production-fa3a.up.railway.app/api/auth';
         this.checkCurrentUser();
     }
 
@@ -215,7 +219,6 @@ class AuthManager {
 
     // Métodos de compatibilidad con código antiguo
     getAuthorizedUsers() {
-        // Este método ahora es asíncrono en realidad, pero se mantiene por compatibilidad
         return [];
     }
 
