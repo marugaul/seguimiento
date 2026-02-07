@@ -1,7 +1,7 @@
 // Gestión de Autenticación con Supabase
 // Configuración de Supabase
 const SUPABASE_URL = 'https://ssqtvztfhcpebmgrswpu.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_6krvllYTk51Ct1sAYSHkkQ_WSVZ4Nkl';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcXR2enRmaGNwZWJtZ3Jzd3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0ODIxMTQsImV4cCI6MjA4NjA1ODExNH0.fARm8JJld3YveagrvH1uqLZ14BmdxhA62sX50bFP-FM';
 
 class AuthManager {
     constructor() {
