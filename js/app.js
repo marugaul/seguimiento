@@ -85,6 +85,11 @@ function showManageAccess() {
     renderManageAccessPage();
 }
 
+function showReleaseMap() {
+    showPage('releaseMap');
+    releaseMapManager.render();
+}
+
 function renderUploadPage() {
     const uploadHtml = `
         <div class="row justify-content-center">
