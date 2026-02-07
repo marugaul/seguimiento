@@ -3,7 +3,7 @@ class AuthManager {
     constructor() {
         this.currentUser = null;
         this.storageKey = 'seguimiento_auth';
-        this.apiBaseUrl = 'http://localhost:3000/api/auth'; // Cambiar en producción
+        this.apiBaseUrl = 'https://seguimiento-production-fa3a.up.railway.app/api/auth';
         this.checkCurrentUser();
     }
 
