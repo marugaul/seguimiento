@@ -436,18 +436,65 @@ class ReleaseMapManager {
     }
 
     getTypeIcon(type) {
-        const typeStr = (type || '').toLowerCase();
-        if (typeStr.includes('proyecto')) return '<i class="bi bi-folder"></i>';
-        if (typeStr.includes('requerimiento')) return '<i class="bi bi-file-text"></i>';
-        if (typeStr.includes('soporte')) return '<i class="bi bi-tools"></i>';
-        return '<i class="bi bi-question"></i>';
+        if (!type) return '<i class="bi bi-question-circle"></i>';
+
+        const typeStr = type.toString().toLowerCase().trim();
+
+        // Proyecto
+        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
+            typeStr === 'p' || typeStr === 'proy') {
+            return '<i class="bi bi-folder-fill"></i>';
+        }
+
+        // Requerimiento
+        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
+            typeStr.includes('req') || typeStr === 'r') {
+            return '<i class="bi bi-file-text-fill"></i>';
+        }
+
+        // Soporte
+        if (typeStr.includes('soporte') || typeStr.includes('support') ||
+            typeStr.includes('sop') || typeStr === 's') {
+            return '<i class="bi bi-tools"></i>';
+        }
+
+        // Ticket
+        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+            return '<i class="bi bi-ticket-detailed-fill"></i>';
+        }
+
+        // Default
+        return '<i class="bi bi-circle-fill"></i>';
     }
 
     getTypeBadgeClass(type) {
-        const typeStr = (type || '').toLowerCase();
-        if (typeStr.includes('proyecto')) return 'type-proyecto';
-        if (typeStr.includes('requerimiento')) return 'type-requerimiento';
-        if (typeStr.includes('soporte')) return 'type-soporte';
+        if (!type) return 'type-default';
+
+        const typeStr = type.toString().toLowerCase().trim();
+
+        // Proyecto
+        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
+            typeStr === 'p' || typeStr === 'proy') {
+            return 'type-proyecto';
+        }
+
+        // Requerimiento
+        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
+            typeStr.includes('req') || typeStr === 'r') {
+            return 'type-requerimiento';
+        }
+
+        // Soporte
+        if (typeStr.includes('soporte') || typeStr.includes('support') ||
+            typeStr.includes('sop') || typeStr === 's') {
+            return 'type-soporte';
+        }
+
+        // Ticket
+        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+            return 'type-ticket';
+        }
+
         return 'type-default';
     }
 }
