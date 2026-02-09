@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Verificación de Versión</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 40px;
+            background: #000;
+            color: #0f0;
+            font-size: 16px;
+        }
+        .ok { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+        h1 { text-shadow: 0 0 10px #0f0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verificación de Versión del Sitio</h1>
+    <pre id="output">Cargando verificación...</pre>
+    <script src="js/auth.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        let log = '';
+
+        function addLog(msg, type = 'ok') {
+            log += `<span class="${type}">${msg}</span>\n`;
+            output.innerHTML = log;
+        }
+
+        // Verificar versión
+        addLog('=== VERIFICACIÓN DE VERSIÓN ===\n', 'ok');
+        addLog(`Timestamp: ${new Date().toISOString()}`, 'ok');
+        addLog(`URL: ${window.location.href}\n`, 'ok');
+
+        // Verificar AuthManager
+        if (typeof authManager === 'undefined') {
+            addLog('❌ ERROR: AuthManager NO está cargado', 'error');
+            addLog('   Esto significa que el archivo NO se actualizó', 'error');
+        } else {
+            addLog('✅ AuthManager está cargado', 'ok');
+
+            if (typeof authManager.initializeUsersSync === 'function') {
+                addLog('✅ Versión CORRECTA detectada (initializeUsersSync existe)', 'ok');
+            } else {
+                addLog('❌ Versión VIEJA detectada (initializeUsersSync NO existe)', 'error');
+                addLog('   GitHub Pages NO se ha actualizado todavía', 'warning');
+            }
+        }
+
+        // Verificar usuarios
+        addLog('\n=== VERIFICACIÓN DE USUARIOS ===\n', 'ok');
+        try {
+            const users = authManager.getAllUsers();
+            addLog(`✅ Usuarios encontrados: ${users.length}`, 'ok');
+
+            if (users.length === 0) {
+                addLog('⚠️  NO hay usuarios - inicializando...', 'warning');
+            } else {
+                addLog('\nUsuarios disponibles:', 'ok');
+                users.forEach(u => {
+                    addLog(`  📧 ${u.email} (${u.rol})`, 'ok');
+                });
+            }
+        } catch (e) {
+            addLog(`❌ Error al obtener usuarios: ${e.message}`, 'error');
+        }
+
+        // Test de login
+        addLog('\n=== TEST DE LOGIN AUTOMÁTICO ===\n', 'ok');
+        authManager.login('admin@seguimiento.com', 'Admin2024!')
+            .then(result => {
+                if (result.success) {
+                    addLog('✅ ¡LOGIN FUNCIONÓ! El sitio está actualizado', 'ok');
+                    addLog('\nPuedes ir a index.html y hacer login', 'ok');
+                } else {
+                    addLog(`❌ Login falló: ${result.message}`, 'error');
+                    if (result.message === 'Usuario no autorizado') {
+                        addLog('\n⚠️  VERSIÓN VIEJA CONFIRMADA', 'warning');
+                        addLog('   GitHub Pages aún no se actualizó', 'warning');
+                        addLog('   Espera 5-10 minutos y recarga esta página', 'warning');
+                    }
+                }
+            })
+            .catch(err => {
+                addLog(`❌ Error crítico: ${err.message}`, 'error');
+            });
+
+        // Instrucciones
+        addLog('\n=== INSTRUCCIONES ===\n', 'ok');
+        addLog('Si ves "Versión VIEJA":', 'warning');
+        addLog('1. Espera 5-10 minutos', 'warning');
+        addLog('2. Recarga esta página (Ctrl+F5 o Cmd+Shift+R)', 'warning');
+        addLog('3. Verifica que diga "Versión CORRECTA"', 'warning');
+        addLog('\nSi ves "Versión CORRECTA":', 'ok');
+        addLog('1. Ve a index.html', 'ok');
+        addLog('2. Login: admin@seguimiento.com / Admin2024!', 'ok');
+    </script>
+</body>
+</html>
