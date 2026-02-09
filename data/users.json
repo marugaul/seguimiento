@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "email": "admin@seguimiento.com",
+    "password": "Admin2024!",
+    "nombre": "Administrador",
+    "rol": "admin",
+    "activo": true,
+    "fechaCreacion": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "email": "delivery@seguimiento.com",
+    "password": "Delivery2024!",
+    "nombre": "Delivery Manager",
+    "rol": "delivery_manager",
+    "activo": true,
+    "fechaCreacion": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "3",
+    "email": "lider@seguimiento.com",
+    "password": "Lider2024!",
+    "nombre": "Líder Técnico",
+    "rol": "lider_tecnico",
+    "activo": true,
+    "fechaCreacion": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "4",
+    "email": "viewer@seguimiento.com",
+    "password": "Viewer2024!",
+    "nombre": "Visualizador",
+    "rol": "viewer",
+    "activo": true,
+    "fechaCreacion": "2024-01-01T00:00:00.000Z"
+  }
+]
