@@ -5,23 +5,22 @@ class AuthManager {
         this.storageKey = 'seguimiento_auth';
         this.usersKey = 'seguimiento_users';
         this.auditLogKey = 'seguimiento_audit_log';
-        this.initializeUsers();
+        this.initialized = false;
+
+        // Inicializar usuarios de forma síncrona
+        this.initializeUsersSync();
         this.checkCurrentUser();
     }
 
-    async initializeUsers() {
-        // Si no hay usuarios en localStorage, cargar desde el archivo JSON
+    initializeUsersSync() {
         const existingUsers = localStorage.getItem(this.usersKey);
+
         if (!existingUsers) {
-            try {
-                const response = await fetch('data/users.json');
-                const initialUsers = await response.json();
-                localStorage.setItem(this.usersKey, JSON.stringify(initialUsers));
-                console.log('Usuarios iniciales cargados desde data/users.json');
-            } catch (error) {
-                console.error('Error cargando usuarios iniciales:', error);
-                // Si falla, crear usuario admin por defecto
-                const defaultUsers = [{
+            console.log('No hay usuarios en localStorage. Creando usuarios por defecto...');
+
+            // Crear usuarios por defecto inmediatamente (no async)
+            const defaultUsers = [
+                {
                     id: "1",
                     email: "admin@seguimiento.com",
                     password: "Admin2024!",
@@ -29,10 +28,46 @@ class AuthManager {
                     rol: "admin",
                     activo: true,
                     fechaCreacion: new Date().toISOString()
-                }];
-                localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
-            }
+                },
+                {
+                    id: "2",
+                    email: "delivery@seguimiento.com",
+                    password: "Delivery2024!",
+                    nombre: "Delivery Manager",
+                    rol: "delivery_manager",
+                    activo: true,
+                    fechaCreacion: new Date().toISOString()
+                },
+                {
+                    id: "3",
+                    email: "lider@seguimiento.com",
+                    password: "Lider2024!",
+                    nombre: "Líder Técnico",
+                    rol: "lider_tecnico",
+                    activo: true,
+                    fechaCreacion: new Date().toISOString()
+                },
+                {
+                    id: "4",
+                    email: "viewer@seguimiento.com",
+                    password: "Viewer2024!",
+                    nombre: "Visualizador",
+                    rol: "viewer",
+                    activo: true,
+                    fechaCreacion: new Date().toISOString()
+                }
+            ];
+
+            localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
+            console.log('✅ Usuarios por defecto creados:', defaultUsers.length);
+            console.table(defaultUsers.map(u => ({ email: u.email, password: u.password, rol: u.rol })));
+        } else {
+            const users = JSON.parse(existingUsers);
+            console.log('✅ Usuarios cargados de localStorage:', users.length);
+            console.table(users.map(u => ({ email: u.email, rol: u.rol, activo: u.activo })));
         }
+
+        this.initialized = true;
     }
 
     checkCurrentUser() {
@@ -40,6 +75,7 @@ class AuthManager {
         if (authData) {
             try {
                 this.currentUser = JSON.parse(authData);
+                console.log('Usuario en sesión:', this.currentUser.email);
             } catch {
                 this.currentUser = null;
             }
@@ -48,13 +84,20 @@ class AuthManager {
 
     async login(email, password) {
         try {
+            console.log('=== Intento de Login ===');
+            console.log('Email:', email);
+            console.log('Password length:', password.length);
+
             const users = this.getAllUsers();
+            console.log('Total usuarios en BD:', users.length);
+
             const user = users.find(u =>
                 u.email.toLowerCase() === email.toLowerCase() &&
                 u.activo === true
             );
 
             if (!user) {
+                console.error('❌ Usuario no encontrado o inactivo');
                 this.logAudit({
                     tipo: 'login_fallido',
                     email: email,
@@ -63,8 +106,14 @@ class AuthManager {
                 return { success: false, message: 'Usuario no encontrado o inactivo' };
             }
 
-            // Verificar password (en producción debería usar hash)
+            console.log('Usuario encontrado:', user.email);
+            console.log('Password esperado:', user.password);
+            console.log('Password recibido:', password);
+            console.log('Passwords coinciden:', user.password === password);
+
+            // Verificar password
             if (user.password !== password) {
+                console.error('❌ Contraseña incorrecta');
                 this.logAudit({
                     tipo: 'login_fallido',
                     email: email,
@@ -91,9 +140,10 @@ class AuthManager {
                 mensaje: 'Login exitoso'
             });
 
+            console.log('✅ Login exitoso');
             return { success: true };
         } catch (error) {
-            console.error('Error en login:', error);
+            console.error('❌ Error en login:', error);
             return { success: false, message: 'Error al procesar el login' };
         }
     }
@@ -151,7 +201,13 @@ class AuthManager {
     getAllUsers() {
         try {
             const usersData = localStorage.getItem(this.usersKey);
-            return usersData ? JSON.parse(usersData) : [];
+            if (!usersData) {
+                console.warn('⚠️ No hay usuarios en localStorage. Reinicializando...');
+                this.initializeUsersSync();
+                const newUsersData = localStorage.getItem(this.usersKey);
+                return newUsersData ? JSON.parse(newUsersData) : [];
+            }
+            return JSON.parse(usersData);
         } catch (error) {
             console.error('Error obteniendo usuarios:', error);
             return [];
@@ -385,6 +441,16 @@ class AuthManager {
         }
     }
 
+    // Método para limpiar y reiniciar usuarios (útil para debugging)
+    resetUsers() {
+        console.log('🔄 Reiniciando usuarios...');
+        localStorage.removeItem(this.usersKey);
+        localStorage.removeItem(this.storageKey);
+        localStorage.removeItem(this.auditLogKey);
+        this.initializeUsersSync();
+        console.log('✅ Usuarios reiniciados. Recarga la página.');
+    }
+
     // Métodos de compatibilidad con código antiguo
     getAuthorizedUsers() {
         return this.getAllUsers().filter(u => u.activo);
@@ -406,3 +472,10 @@ class AuthManager {
 
 // Crear instancia global
 const authManager = new AuthManager();
+
+// Exponer función de reset para debugging
+window.resetAuth = () => {
+    authManager.resetUsers();
+};
+
+console.log('🔐 AuthManager inicializado. Para reiniciar usuarios, ejecuta: resetAuth()');
