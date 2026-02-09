@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Autenticación</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+        }
+        .section {
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        h1, h2 {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #00cc00;
+            box-shadow: 0 0 20px #00ff00;
+        }
+        input {
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px;
+            font-size: 16px;
+            margin: 5px;
+            width: 300px;
+        }
+        pre {
+            background: #000;
+            padding: 10px;
+            border-left: 3px solid #00ff00;
+            overflow-x: auto;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .warning { color: #ffff00; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Test de Autenticación - Diagnóstico Completo</h1>
+
+    <div class="section">
+        <h2>1. Información del Sistema</h2>
+        <pre id="systemInfo">Cargando...</pre>
+    </div>
+
+    <div class="section">
+        <h2>2. Estado de localStorage</h2>
+        <button onclick="showLocalStorage()">📊 Ver localStorage</button>
+        <button onclick="clearStorage()">🗑️ Limpiar TODO</button>
+        <pre id="storageInfo">Haz clic en "Ver localStorage"</pre>
+    </div>
+
+    <div class="section">
+        <h2>3. Usuarios en Base de Datos</h2>
+        <button onclick="showUsers()">👥 Ver Usuarios</button>
+        <button onclick="resetUsers()">🔄 Reiniciar Usuarios</button>
+        <pre id="usersInfo">Haz clic en "Ver Usuarios"</pre>
+    </div>
+
+    <div class="section">
+        <h2>4. Test de Login</h2>
+        <div>
+            <input type="email" id="testEmail" placeholder="Email" value="admin@seguimiento.com">
+            <input type="password" id="testPassword" placeholder="Password" value="Admin2024!">
+        </div>
+        <button onclick="testLogin()">🚀 Probar Login</button>
+        <pre id="loginResult">Ingresa credenciales y haz clic en "Probar Login"</pre>
+    </div>
+
+    <div class="section">
+        <h2>5. Verificación de Código</h2>
+        <pre id="codeCheck">Verificando versión del código...</pre>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        // 1. Info del sistema
+        function updateSystemInfo() {
+            const info = {
+                'URL': window.location.href,
+                'User Agent': navigator.userAgent,
+                'Fecha/Hora': new Date().toLocaleString(),
+                'localStorage disponible': typeof(Storage) !== "undefined",
+                'AuthManager cargado': typeof authManager !== 'undefined',
+                'AuthManager inicializado': authManager?.initialized || false
+            };
+            document.getElementById('systemInfo').innerHTML = JSON.stringify(info, null, 2);
+        }
+
+        // 2. Ver localStorage
+        function showLocalStorage() {
+            const storage = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                try {
+                    storage[key] = JSON.parse(localStorage.getItem(key));
+                } catch (e) {
+                    storage[key] = localStorage.getItem(key);
+                }
+            }
+            document.getElementById('storageInfo').innerHTML = JSON.stringify(storage, null, 2);
+        }
+
+        function clearStorage() {
+            if (confirm('⚠️ Esto borrará TODO el localStorage. ¿Continuar?')) {
+                localStorage.clear();
+                alert('✅ localStorage limpiado. Recarga la página (F5).');
+                location.reload();
+            }
+        }
+
+        // 3. Ver usuarios
+        function showUsers() {
+            if (typeof authManager === 'undefined') {
+                document.getElementById('usersInfo').innerHTML = '<span class="error">❌ AuthManager no está cargado</span>';
+                return;
+            }
+
+            const users = authManager.getAllUsers();
+            const userDisplay = users.map(u => ({
+                id: u.id,
+                email: u.email,
+                password: u.password,
+                rol: u.rol,
+                activo: u.activo
+            }));
+
+            document.getElementById('usersInfo').innerHTML =
+                `<span class="success">✅ Total usuarios: ${users.length}</span>\n` +
+                JSON.stringify(userDisplay, null, 2);
+        }
+
+        function resetUsers() {
+            if (confirm('🔄 Esto reiniciará los usuarios por defecto. ¿Continuar?')) {
+                if (typeof resetAuth !== 'undefined') {
+                    resetAuth();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    localStorage.removeItem('seguimiento_users');
+                    alert('✅ Usuarios eliminados. Recarga la página (F5).');
+                    location.reload();
+                }
+            }
+        }
+
+        // 4. Test de login
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            const resultDiv = document.getElementById('loginResult');
+
+            resultDiv.innerHTML = '<span class="warning">⏳ Intentando login...</span>';
+
+            console.log('=== TEST LOGIN ===');
+            console.log('Email:', email);
+            console.log('Password:', password);
+
+            if (typeof authManager === 'undefined') {
+                resultDiv.innerHTML = '<span class="error">❌ AuthManager no está cargado</span>';
+                return;
+            }
+
+            try {
+                const result = await authManager.login(email, password);
+
+                if (result.success) {
+                    resultDiv.innerHTML =
+                        `<span class="success">✅ LOGIN EXITOSO!</span>\n` +
+                        `Usuario: ${authManager.getCurrentUser().email}\n` +
+                        `Rol: ${authManager.getCurrentUser().rol}\n` +
+                        `\nAhora puedes ir al index.html`;
+                } else {
+                    resultDiv.innerHTML =
+                        `<span class="error">❌ LOGIN FALLÓ</span>\n` +
+                        `Mensaje: ${result.message}\n` +
+                        `\nRevisa la consola (F12) para más detalles.`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML =
+                    `<span class="error">❌ ERROR CRÍTICO</span>\n` +
+                    `${error.message}\n` +
+                    `${error.stack}`;
+            }
+        }
+
+        // 5. Verificar versión del código
+        function checkCodeVersion() {
+            const checks = {
+                'AuthManager existe': typeof authManager !== 'undefined',
+                'initializeUsersSync existe': authManager?.initializeUsersSync !== undefined,
+                'resetAuth función existe': typeof resetAuth !== 'undefined',
+                'Versión correcta': authManager?.initialized !== undefined
+            };
+
+            let html = '';
+            for (let [check, result] of Object.entries(checks)) {
+                const icon = result ? '✅' : '❌';
+                const className = result ? 'success' : 'error';
+                html += `<span class="${className}">${icon} ${check}</span>\n`;
+            }
+
+            document.getElementById('codeCheck').innerHTML = html;
+        }
+
+        // Ejecutar al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            updateSystemInfo();
+            checkCodeVersion();
+            console.log('%c🔐 Página de Test de Autenticación cargada', 'font-size: 20px; color: #00ff00;');
+            console.log('AuthManager:', authManager);
+        });
+    </script>
+</body>
+</html>
