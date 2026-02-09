@@ -4,6 +4,7 @@ class DashboardManager {
         this.projects = [];
         this.filteredProjects = [];
         this.charts = {};
+        this.tableZoom = 100; // Nivel de zoom de la tabla (porcentaje)
         this.filters = {
             lider: '',
             pais: '',
@@ -11,6 +12,10 @@ class DashboardManager {
             etapa: '',
             tipo: '',           // LOCAL o REGIONAL
             categoria: '',      // PROYECTO, SOPORTE, REQUERIMIENTO
+            producto: '',       // PRODUCTO
+            area: '',           // ÁREA
+            numero: '',         // NÚMERO (búsqueda parcial)
+            nombre: '',         // NOMBRE (búsqueda parcial)
             alertaPresupuesto: '',  // CRITICO, OK, ADVERTENCIA
             estadoDesviacion: ''    // RETRASADO, ADELANTADO, EN_TIEMPO
         };
@@ -69,8 +74,19 @@ class DashboardManager {
                 }
             }
 
+            // HRS EST. = Usar TOTAL ESTIMACIÓN directamente del Excel
+            // El valor ya viene correcto del Excel (ESTIMACION + CONTROL CAMBIO)
+            // No se recalcula, getNumericValue() ahora maneja correctamente el formato con comas
+
+            // DESV. HRS = TOTAL DISPONIBLE (columna Excel)
+            project.desvHoras = project.totalDisponible || 0;
+
+            // % DESV. = (DESV. HRS / HRS. ESTIMADAS) * 100
+            project.porcentajeDesviacion = project.totalEstimacion > 0 ?
+                (project.desvHoras / project.totalEstimacion) * 100 : 0;
+
             // Validar presupuesto basado en consumo real vs estimado
-            const presupuestoPlaneado = project.estimacion + project.controlCambio;
+            const presupuestoPlaneado = project.totalEstimacion;
             const horasConsumidas = project.totalRegistrado;
 
             // Calcular porcentaje de consumo
@@ -96,13 +112,17 @@ class DashboardManager {
             // Parsear porcentajes para comparación
             project.avanceRealNumerico = this.parsePercentage(project.porcentajeAvanceReal);
             project.avanceEsperadoNumerico = this.parsePercentage(project.porcentajeAvanceEsperado);
-            project.avanceHorasNumerico = this.parsePercentage(project.porcentajeAvanceHoras);
 
-            // Calcular % Presupuesto Usado: (Hrs Registradas / Hrs Estimadas) * 100
-            project.porcentajePresupuestoUsado = project.totalEstimacion > 0 ?
-                (project.totalRegistrado / project.totalEstimacion) * 100 : 0;
+            // PRESUP. USADO = % AVANCE HORAS directo del Excel
+            // Excel guarda los porcentajes como decimales (0.83 = 83%), así que multiplicamos x100
+            const avanceHorasStr = String(project.porcentajeAvanceHoras || '0')
+                .replace('%', '')
+                .replace(',', '.')
+                .trim();
+            const avanceHorasDecimal = parseFloat(avanceHorasStr) || 0;
+            project.porcentajePresupuestoUsado = avanceHorasDecimal * 100;
 
-            // Calcular Diferencia Avance vs Presupuesto: % Presupuesto Usado - % Avance Real
+            // DIF. AVANCE VS PRESUP. = Presup. Usado - Avance Real
             project.difAvanceVsPresupuesto = project.porcentajePresupuestoUsado - project.avanceRealNumerico;
 
             // Determinar si está desviado (más de 10% de diferencia)
@@ -196,6 +216,12 @@ class DashboardManager {
             if (this.filters.etapa && project.etapa !== this.filters.etapa) return false;
             if (this.filters.tipo && project.tipo !== this.filters.tipo) return false;
             if (this.filters.categoria && project.categoria !== this.filters.categoria) return false;
+            if (this.filters.producto && project.producto !== this.filters.producto) return false;
+            if (this.filters.area && project.area !== this.filters.area) return false;
+            // Búsqueda parcial para número (LIKE)
+            if (this.filters.numero && !String(project.numero || '').toUpperCase().includes(this.filters.numero.toUpperCase())) return false;
+            // Búsqueda parcial para nombre (LIKE)
+            if (this.filters.nombre && !String(project.nombre || '').toUpperCase().includes(this.filters.nombre.toUpperCase())) return false;
             if (this.filters.alertaPresupuesto && project.alertaPresupuesto !== this.filters.alertaPresupuesto) return false;
             if (this.filters.estadoDesviacion && project.estadoDesviacion !== this.filters.estadoDesviacion) return false;
             return true;
@@ -264,6 +290,10 @@ class DashboardManager {
             etapa: '',
             tipo: '',
             categoria: '',
+            producto: '',
+            area: '',
+            numero: '',
+            nombre: '',
             alertaPresupuesto: '',
             estadoDesviacion: ''
         };
@@ -286,7 +316,11 @@ class DashboardManager {
             pais: 'País',
             estado: 'Estado Proyecto',
             etapa: 'Etapa',
-            tipo: 'Tipo'
+            tipo: 'Tipo',
+            producto: 'Producto',
+            area: 'Área',
+            numero: 'Número',
+            nombre: 'Nombre'
         };
 
         for (const [key, value] of Object.entries(this.filters)) {
@@ -427,6 +461,8 @@ class DashboardManager {
         const dashboardHtml = this.generateDashboardHTML();
         document.getElementById('dashboardPage').innerHTML = dashboardHtml;
         this.renderCharts();
+        // Aplicar zoom después de renderizar
+        setTimeout(() => this.applyTableZoom(), 100);
     }
 
     generateDashboardHTML() {
@@ -437,6 +473,8 @@ class DashboardManager {
         const estados = this.getUniqueValues('estado');
         const etapas = this.getUniqueValues('etapa');
         const tipos = this.getUniqueValues('tipo');
+        const productos = this.getUniqueValues('producto');
+        const areas = this.getUniqueValues('area');
 
         return `
             <div class="row mb-4">
@@ -580,6 +618,50 @@ class DashboardManager {
                                 <option value="">Todas</option>
                                 ${etapas.map(e => `<option value="${e}" ${this.filters.etapa === e ? 'selected' : ''}>${e}</option>`).join('')}
                             </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Producto</label>
+                            <select id="filterProducto" class="form-select" onchange="dashboardManager.setFilter('producto', this.value)">
+                                <option value="">Todos</option>
+                                ${productos.map(p => `<option value="${p}" ${this.filters.producto === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Área</label>
+                            <select id="filterArea" class="form-select" onchange="dashboardManager.setFilter('area', this.value)">
+                                <option value="">Todas</option>
+                                ${areas.map(a => `<option value="${a}" ${this.filters.area === a ? 'selected' : ''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Buscar Número (Proyecto/Req/Soporte)</label>
+                            <div class="input-group">
+                                <input type="text"
+                                       id="filterNumero"
+                                       class="form-control"
+                                       placeholder="Ej: 161, PFCTI-161, INCRC-439..."
+                                       value="${this.filters.numero}"
+                                       onkeypress="if(event.key === 'Enter') { dashboardManager.setFilter('numero', document.getElementById('filterNumero').value); }">
+                                <button class="btn btn-primary" type="button" onclick="dashboardManager.setFilter('numero', document.getElementById('filterNumero').value)">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Buscar por Nombre</label>
+                            <div class="input-group">
+                                <input type="text"
+                                       id="filterNombre"
+                                       class="form-control"
+                                       placeholder="Ej: TRAER FONDOS, DASHBOARD..."
+                                       value="${this.filters.nombre}"
+                                       onkeypress="if(event.key === 'Enter') { dashboardManager.setFilter('nombre', document.getElementById('filterNombre').value); }">
+                                <button class="btn btn-primary" type="button" onclick="dashboardManager.setFilter('nombre', document.getElementById('filterNombre').value)">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="row mt-3">
@@ -766,28 +848,47 @@ class DashboardManager {
             <!-- Tabla de proyectos mejorada -->
             <div class="card" id="projectsTable">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
-                        ${this.getActiveFiltersHTML()}
-                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="mb-0">
+                            <i class="bi bi-table"></i> Detalle de Proyectos (${this.filteredProjects.length} registros)
+                            ${this.getActiveFiltersHTML()}
+                        </h5>
+                        <div class="btn-group btn-group-sm ms-3" role="group" aria-label="Zoom controls">
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.zoomOut()" title="Alejar zoom">
+                                <i class="bi bi-zoom-out"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.resetZoom()" title="Restablecer zoom">
+                                <span id="zoomIndicator">100%</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="dashboardManager.zoomIn()" title="Acercar zoom">
+                                <i class="bi bi-zoom-in"></i>
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm ms-2" onclick="dashboardManager.exportToExcel()" title="Exportar a Excel">
+                            <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                        </button>
+                    </div>
                     ${Object.values(this.filters).some(f => f) ?
                         '<button class="btn btn-sm btn-outline-danger" onclick="dashboardManager.clearFilters()"><i class="bi bi-x-circle"></i> Limpiar Filtros</button>'
                         : ''}
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
+                    <div class="table-responsive" style="max-height: 600px; overflow-x: auto; overflow-y: auto;">
                         <table class="table table-striped table-hover table-sm">
-                            <thead class="table-dark">
+                            <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                                 <tr>
                                     ${this.generateSortableHeader('tipo', 'Tipo')}
                                     ${this.generateSortableHeader('categoria', 'Categoría')}
                                     ${this.generateSortableHeader('numero', 'Número')}
                                     ${this.generateSortableHeader('nombreLt', 'Líder Técnico')}
                                     ${this.generateSortableHeader('pais', 'País')}
+                                    ${this.generateSortableHeader('producto', 'Producto')}
+                                    ${this.generateSortableHeader('area', 'Área')}
                                     ${this.generateSortableHeader('nombre', 'Nombre')}
                                     ${this.generateSortableHeader('estado', 'Estado')}
                                     ${this.generateSortableHeader('fecRegistroIniciativa', 'Fecha Registro', 'text-center')}
                                     ${this.generateSortableHeader('totalEstimacion', 'Hrs Est.', 'text-end')}
+                                    ${this.generateSortableHeader('controlCambio', 'Control Cambio', 'text-end')}
                                     ${this.generateSortableHeader('totalRegistrado', 'Hrs Reg.', 'text-end')}
                                     ${this.generateSortableHeader('desvHoras', 'Desv. Hrs', 'text-end')}
                                     ${this.generateSortableHeader('porcentajeDesviacion', '% Desv.', 'text-end')}
@@ -836,8 +937,14 @@ class DashboardManager {
         const alertaSemaforo = project.alertaPresupuesto === 'CRITICO' ? '🔴' :
                               project.alertaPresupuesto === 'OK' ? '🟢' : '🟡';
 
-        const desviacionColor = project.desvHoras < 0 ? 'text-success' :
-                               project.desvHoras > 0 ? 'text-danger' : '';
+        // Desv. hrs: ROJO si negativo (excedido), VERDE si positivo (disponible)
+        const desviacionColor = project.desvHoras < 0 ? 'text-danger' :
+                               project.desvHoras > 0 ? 'text-success' : '';
+
+        // Presup. usado: ROJO si ≥100%, AMARILLO si 90-99% (falta 10%), VERDE si <90% (más de 10% disponible)
+        const presupUsado = project.porcentajePresupuestoUsado;
+        const presupUsadoColor = presupUsado >= 100 ? 'text-danger' :
+                                presupUsado >= 90 ? 'text-warning' : 'text-success';
 
         // Indicadores Sí/No
         const esAtrasado = project.estadoDesviacion === 'RETRASADO';
@@ -856,16 +963,19 @@ class DashboardManager {
                 <td><small>${project.numero}</small></td>
                 <td><strong>${project.nombreLt}</strong></td>
                 <td>${project.pais}</td>
+                <td><small>${project.producto || '-'}</small></td>
+                <td><small>${project.area || '-'}</small></td>
                 <td><small>${project.nombre.substring(0, 40)}${project.nombre.length > 40 ? '...' : ''}</small></td>
                 <td><span class="badge ${estadoBadgeClass}">${project.estado}</span></td>
                 <td class="text-center"><small>${fechaRegistro}</small></td>
                 <td class="text-end">${project.totalEstimacion.toLocaleString('es')}</td>
+                <td class="text-end">${(project.controlCambio || 0).toLocaleString('es')}</td>
                 <td class="text-end">${project.totalRegistrado.toLocaleString('es')}</td>
                 <td class="text-end ${desviacionColor}"><strong>${project.desvHoras.toLocaleString('es')}</strong></td>
                 <td class="text-end ${desviacionColor}"><strong>${this.formatPercentage(project.porcentajeDesviacion)}%</strong></td>
                 <td class="text-end">${project.avanceRealNumerico.toFixed(2)}%</td>
                 <td class="text-end">${project.avanceEsperadoNumerico.toFixed(2)}%</td>
-                <td class="text-end"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
+                <td class="text-end ${presupUsadoColor}"><strong>${project.porcentajePresupuestoUsado.toFixed(2)}%</strong></td>
                 <td class="text-end ${project.difAvanceVsPresupuesto > 0 ? 'text-danger' : project.difAvanceVsPresupuesto < 0 ? 'text-success' : ''}">
                     <strong>${project.difAvanceVsPresupuesto.toFixed(2)}%</strong>
                 </td>
@@ -1231,6 +1341,105 @@ class DashboardManager {
                 scales: { y: { beginAtZero: true } }
             }
         });
+    }
+
+    zoomIn() {
+        if (this.tableZoom < 150) {
+            this.tableZoom += 10;
+            this.applyTableZoom();
+        }
+    }
+
+    zoomOut() {
+        if (this.tableZoom > 60) {
+            this.tableZoom -= 10;
+            this.applyTableZoom();
+        }
+    }
+
+    resetZoom() {
+        this.tableZoom = 100;
+        this.applyTableZoom();
+    }
+
+    applyTableZoom() {
+        const table = document.querySelector('#projectsTable table');
+        if (table) {
+            table.style.fontSize = `${this.tableZoom}%`;
+        }
+        // Actualizar el indicador de zoom
+        const zoomIndicator = document.getElementById('zoomIndicator');
+        if (zoomIndicator) {
+            zoomIndicator.textContent = `${this.tableZoom}%`;
+        }
+    }
+
+    exportToExcel() {
+        // Preparar datos para exportar
+        const exportData = this.filteredProjects.map(project => ({
+            'Tipo': project.tipo,
+            'Categoría': project.categoria,
+            'Número': project.numero,
+            'Líder Técnico': project.nombreLt,
+            'País': project.pais,
+            'Producto': project.producto || '',
+            'Área': project.area || '',
+            'Nombre': project.nombre,
+            'Estado': project.estado,
+            'Fecha Registro': project.fecRegistroIniciativa || '',
+            'Hrs Est.': project.totalEstimacion,
+            'Control Cambio': project.controlCambio || 0,
+            'Hrs Reg.': project.totalRegistrado,
+            'Desv. Hrs': project.desvHoras,
+            '% Desv.': project.porcentajeDesviacion.toFixed(2),
+            '% Real': project.avanceRealNumerico.toFixed(2),
+            '% Esperado': project.avanceEsperadoNumerico.toFixed(2),
+            '% Presup. Usado': project.porcentajePresupuestoUsado.toFixed(2),
+            'Dif. Avance vs Presup.': project.difAvanceVsPresupuesto.toFixed(2),
+            '¿Atrasado?': project.estadoDesviacion === 'RETRASADO' ? 'SÍ' : 'NO',
+            '¿Fuera Presup.?': project.alertaPresupuesto === 'CRITICO' ? 'SÍ' : 'NO',
+            'Comentarios': project.comentarios || ''
+        }));
+
+        // Crear libro de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportData);
+
+        // Ajustar ancho de columnas
+        const colWidths = [
+            { wch: 10 },  // Tipo
+            { wch: 15 },  // Categoría
+            { wch: 20 },  // Número
+            { wch: 20 },  // Líder Técnico
+            { wch: 10 },  // País
+            { wch: 15 },  // Producto
+            { wch: 15 },  // Área
+            { wch: 50 },  // Nombre
+            { wch: 15 },  // Estado
+            { wch: 15 },  // Fecha Registro
+            { wch: 12 },  // Hrs Est.
+            { wch: 15 },  // Control Cambio
+            { wch: 12 },  // Hrs Reg.
+            { wch: 12 },  // Desv. Hrs
+            { wch: 12 },  // % Desv.
+            { wch: 12 },  // % Real
+            { wch: 12 },  // % Esperado
+            { wch: 15 },  // % Presup. Usado
+            { wch: 20 },  // Dif. Avance vs Presup.
+            { wch: 12 },  // ¿Atrasado?
+            { wch: 15 },  // ¿Fuera Presup.?
+            { wch: 30 }   // Comentarios
+        ];
+        ws['!cols'] = colWidths;
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Detalle Proyectos');
+
+        // Generar nombre de archivo con fecha
+        const now = new Date();
+        const filename = `Detalle_Proyectos_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.xlsx`;
+
+        // Descargar archivo
+        XLSX.writeFile(wb, filename);
     }
 
     groupBy(array, field) {
