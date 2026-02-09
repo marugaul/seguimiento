@@ -1,17 +1,34 @@
-// Release Map Manager
+// Release Map Manager con Drag & Drop
 class ReleaseMapManager {
     constructor() {
         this.projects = [];
         this.selectedProjects = [];
         this.selectedLeaders = [];
-        this.selectedTypes = ['Proyecto', 'Requerimiento', 'Soporte']; // Por defecto todos
+        this.selectedTypes = ['Proyecto', 'Requerimiento', 'Soporte'];
         this.currentYear = new Date().getFullYear();
         this.months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        this.releaseAssignments = {}; // Almacena asignaciones de proyectos a meses/semanas
+        this.loadAssignments();
     }
 
     loadProjects() {
         this.projects = storageManager.getProjects() || [];
         return this.projects;
+    }
+
+    loadAssignments() {
+        const saved = localStorage.getItem('seguimiento_release_assignments');
+        if (saved) {
+            try {
+                this.releaseAssignments = JSON.parse(saved);
+            } catch (e) {
+                this.releaseAssignments = {};
+            }
+        }
+    }
+
+    saveAssignments() {
+        localStorage.setItem('seguimiento_release_assignments', JSON.stringify(this.releaseAssignments));
     }
 
     getUniqueLeaders() {
@@ -30,7 +47,6 @@ class ReleaseMapManager {
     filterProjects() {
         let filtered = this.projects;
 
-        // Filtrar por tipo de proyecto
         if (this.selectedTypes.length > 0 && this.selectedTypes.length < 3) {
             filtered = filtered.filter(p => {
                 const projectType = (p.tipoProyecto || '').toLowerCase();
@@ -38,12 +54,10 @@ class ReleaseMapManager {
             });
         }
 
-        // Filtrar por líder técnico
         if (this.selectedLeaders.length > 0) {
             filtered = filtered.filter(p => this.selectedLeaders.includes(p.nombreLt));
         }
 
-        // Filtrar por proyectos específicos
         if (this.selectedProjects.length > 0) {
             filtered = filtered.filter(p => this.selectedProjects.includes(p.proyectoFs));
         }
@@ -51,37 +65,66 @@ class ReleaseMapManager {
         return filtered;
     }
 
-    getMonthlyData() {
-        const filtered = this.filterProjects();
-        const monthlyData = {};
-
-        // Inicializar datos mensuales
+    // Sugerencia automática basada en horas
+    suggestRelease(project) {
+        const monthlyHours = [];
         for (let i = 1; i <= 12; i++) {
-            monthlyData[i] = [];
+            const monthKey = `mes${String(i).padStart(2, '0')}`;
+            const hours = parseFloat(project[monthKey]) || 0;
+            monthlyHours.push({ month: i, hours: hours });
         }
 
-        // Agrupar proyectos por mes
-        filtered.forEach(project => {
-            for (let i = 1; i <= 12; i++) {
-                const monthKey = `mes${String(i).padStart(2, '0')}`;
-                const hours = parseFloat(project[monthKey]) || 0;
+        // Encontrar el mes con más horas
+        const maxHours = Math.max(...monthlyHours.map(m => m.hours));
+        const suggestedMonth = monthlyHours.find(m => m.hours === maxHours);
 
-                if (hours > 0) {
-                    monthlyData[i].push({
-                        project: project,
-                        hours: hours,
-                        name: project.nombre,
-                        leader: project.nombreLt,
-                        code: project.proyectoFs,
-                        type: project.tipoProyecto,
-                        estado: project.estado,
-                        etapa: project.etapa
-                    });
-                }
-            }
+        // Sugerir última semana del mes con más horas
+        return {
+            month: suggestedMonth.month,
+            week: 4,
+            reason: `Sugerido: ${maxHours.toFixed(0)} horas planificadas en ${this.months[suggestedMonth.month - 1]}`
+        };
+    }
+
+    assignProjectToRelease(projectCode, month, week) {
+        const key = `${month}-${week}`;
+        if (!this.releaseAssignments[key]) {
+            this.releaseAssignments[key] = [];
+        }
+
+        // Remover de otras asignaciones
+        Object.keys(this.releaseAssignments).forEach(k => {
+            this.releaseAssignments[k] = this.releaseAssignments[k].filter(p => p !== projectCode);
         });
 
-        return monthlyData;
+        // Agregar a la nueva asignación
+        if (!this.releaseAssignments[key].includes(projectCode)) {
+            this.releaseAssignments[key].push(projectCode);
+        }
+
+        this.saveAssignments();
+    }
+
+    removeProjectFromRelease(projectCode) {
+        Object.keys(this.releaseAssignments).forEach(key => {
+            this.releaseAssignments[key] = this.releaseAssignments[key].filter(p => p !== projectCode);
+        });
+        this.saveAssignments();
+    }
+
+    getAssignedProjects(month, week) {
+        const key = `${month}-${week}`;
+        const projectCodes = this.releaseAssignments[key] || [];
+        return projectCodes.map(code => this.projects.find(p => p.proyectoFs === code)).filter(Boolean);
+    }
+
+    getUnassignedProjects() {
+        const filtered = this.filterProjects();
+        const allAssigned = new Set();
+        Object.values(this.releaseAssignments).forEach(arr => {
+            arr.forEach(code => allAssigned.add(code));
+        });
+        return filtered.filter(p => !allAssigned.has(p.proyectoFs));
     }
 
     calculateTotals() {
@@ -105,40 +148,10 @@ class ReleaseMapManager {
         };
     }
 
-    exportToExcel() {
-        const monthlyData = this.getMonthlyData();
-        const exportData = [];
-
-        // Crear filas para exportar
-        for (let month = 1; month <= 12; month++) {
-            const projects = monthlyData[month];
-            projects.forEach(item => {
-                exportData.push({
-                    'Mes': this.months[month - 1],
-                    'Código': item.code,
-                    'Proyecto': item.name,
-                    'Tipo': item.type,
-                    'Líder Técnico': item.leader,
-                    'Estado': item.estado,
-                    'Etapa': item.etapa,
-                    'Horas': item.hours
-                });
-            });
-        }
-
-        // Crear workbook y worksheet
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Mapa de Liberaciones');
-
-        // Descargar archivo
-        const fileName = `mapa_liberaciones_${this.currentYear}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-    }
-
     render() {
         this.loadProjects();
         this.renderReleaseMapPage();
+        this.initializeDragAndDrop();
     }
 
     renderReleaseMapPage() {
@@ -147,7 +160,7 @@ class ReleaseMapManager {
         const requerimientos = this.getProjectsByType('Requerimiento');
         const soportes = this.getProjectsByType('Soporte');
         const totals = this.calculateTotals();
-        const monthlyData = this.getMonthlyData();
+        const unassignedProjects = this.getUnassignedProjects();
 
         const html = `
             <div class="row mb-4">
@@ -156,190 +169,109 @@ class ReleaseMapManager {
                         <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h4 class="mb-0">
-                                    <i class="bi bi-calendar-range"></i> Mapa de Liberaciones Anuales ${this.currentYear}
+                                    <i class="bi bi-calendar-range"></i> Mapa de Liberaciones ${this.currentYear} - Drag & Drop
                                 </h4>
-                                <button class="btn btn-light btn-sm" onclick="releaseMapManager.exportToExcel()">
-                                    <i class="bi bi-download"></i> Exportar Excel
-                                </button>
+                                <div>
+                                    <button class="btn btn-warning btn-sm me-2" onclick="releaseMapManager.autoSuggestAll()">
+                                        <i class="bi bi-magic"></i> Auto-Sugerir Todas
+                                    </button>
+                                    <button class="btn btn-light btn-sm" onclick="releaseMapManager.exportToExcel()">
+                                        <i class="bi bi-download"></i> Exportar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body">
                             <p class="text-muted mb-0">
-                                <i class="bi bi-info-circle"></i> Herramienta para planificar y visualizar las liberaciones anuales de proyectos, requerimientos y soportes.
+                                <i class="bi bi-info-circle"></i> Arrastra proyectos desde el panel lateral hacia el mes y semana deseados.
+                                Las sugerencias están basadas en las horas planificadas.
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Resumen de Totales -->
-            <div class="row mb-4">
-                <div class="col-md-4">
-                    <div class="card stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <h6 class="text-white-50">Total Proyectos Seleccionados</h6>
-                        <h2 class="mb-0">${totals.projects}</h2>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <h6 class="text-white-50">Horas Planificadas</h6>
-                        <h2 class="mb-0">${totals.hours.toFixed(0)}</h2>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <h6 class="text-white-50">Horas Estimadas Total</h6>
-                        <h2 class="mb-0">${totals.estimated.toFixed(0)}</h2>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filtros de Selección -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
+            <div class="row">
+                <!-- Panel lateral con proyectos disponibles -->
+                <div class="col-md-3">
+                    <div class="card sticky-top" style="top: 20px;">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros de Selección</h5>
+                            <h5 class="mb-0"><i class="bi bi-list-task"></i> Proyectos Disponibles</h5>
                         </div>
                         <div class="card-body">
-                            <!-- Tipos de Proyecto -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-layers"></i> Tipos de Proyecto
-                                </label>
-                                <div class="d-flex gap-3 flex-wrap">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="typeProyecto"
-                                               value="Proyecto" ${this.selectedTypes.includes('Proyecto') ? 'checked' : ''}
+                            <!-- Filtros -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tipo</label>
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="filterProyecto"
+                                               ${this.selectedTypes.includes('Proyecto') ? 'checked' : ''}
                                                onchange="releaseMapManager.toggleType('Proyecto')">
-                                        <label class="form-check-label" for="typeProyecto">
-                                            <i class="bi bi-folder"></i> Proyectos (${proyectos.length})
+                                        <label class="form-check-label" for="filterProyecto">
+                                            <small>Proyectos</small>
                                         </label>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="typeRequerimiento"
-                                               value="Requerimiento" ${this.selectedTypes.includes('Requerimiento') ? 'checked' : ''}
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="filterReq"
+                                               ${this.selectedTypes.includes('Requerimiento') ? 'checked' : ''}
                                                onchange="releaseMapManager.toggleType('Requerimiento')">
-                                        <label class="form-check-label" for="typeRequerimiento">
-                                            <i class="bi bi-file-text"></i> Requerimientos (${requerimientos.length})
+                                        <label class="form-check-label" for="filterReq">
+                                            <small>Req.</small>
                                         </label>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="typeSoporte"
-                                               value="Soporte" ${this.selectedTypes.includes('Soporte') ? 'checked' : ''}
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="filterSoporte"
+                                               ${this.selectedTypes.includes('Soporte') ? 'checked' : ''}
                                                onchange="releaseMapManager.toggleType('Soporte')">
-                                        <label class="form-check-label" for="typeSoporte">
-                                            <i class="bi bi-tools"></i> Soportes (${soportes.length})
+                                        <label class="form-check-label" for="filterSoporte">
+                                            <small>Soporte</small>
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Líderes Técnicos -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-person-badge"></i> Líderes Técnicos
-                                </label>
-                                <div class="d-flex gap-2 mb-2">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="releaseMapManager.selectAllLeaders()">
-                                        <i class="bi bi-check-all"></i> Seleccionar Todos
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="releaseMapManager.clearAllLeaders()">
-                                        <i class="bi bi-x-circle"></i> Limpiar Selección
-                                    </button>
-                                </div>
-                                <div class="leader-selection-container">
-                                    ${leaders.length === 0 ? `
-                                        <div class="alert alert-warning">
-                                            <i class="bi bi-exclamation-triangle"></i>
-                                            No hay líderes técnicos disponibles. Por favor, cargue datos primero.
-                                        </div>
-                                    ` : `
-                                        <div class="row g-2">
-                                            ${leaders.map(leader => `
-                                                <div class="col-md-3 col-sm-4 col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input leader-checkbox" type="checkbox"
-                                                               id="leader_${this.sanitizeId(leader)}"
-                                                               value="${leader}"
-                                                               ${this.selectedLeaders.includes(leader) ? 'checked' : ''}
-                                                               onchange="releaseMapManager.toggleLeader('${leader}')">
-                                                        <label class="form-check-label" for="leader_${this.sanitizeId(leader)}">
-                                                            ${leader}
-                                                        </label>
+                            <!-- Lista de proyectos sin asignar -->
+                            <div class="unassigned-projects-container" style="max-height: 600px; overflow-y: auto;">
+                                ${unassignedProjects.length === 0 ? `
+                                    <div class="alert alert-success">
+                                        <i class="bi bi-check-circle"></i>
+                                        <small>Todos los proyectos están asignados</small>
+                                    </div>
+                                ` : unassignedProjects.map(project => {
+                                    const suggestion = this.suggestRelease(project);
+                                    return `
+                                        <div class="project-card draggable" draggable="true"
+                                             data-project-code="${project.proyectoFs}"
+                                             data-suggested-month="${suggestion.month}"
+                                             data-suggested-week="${suggestion.week}">
+                                            <div class="d-flex align-items-start">
+                                                <div class="project-type-icon ${this.getTypeBadgeClass(project.tipoProyecto)}">
+                                                    ${this.getTypeIcon(project.tipoProyecto)}
+                                                </div>
+                                                <div class="flex-grow-1 ms-2">
+                                                    <div class="project-code-sm">${project.proyectoFs}</div>
+                                                    <div class="project-name-sm">${this.truncate(project.nombre, 35)}</div>
+                                                    <div class="project-leader-sm">
+                                                        <i class="bi bi-person"></i> ${project.nombreLt || '-'}
+                                                    </div>
+                                                    <div class="project-suggestion">
+                                                        <i class="bi bi-lightbulb text-warning"></i>
+                                                        <small>${suggestion.reason}</small>
                                                     </div>
                                                 </div>
-                                            `).join('')}
+                                            </div>
                                         </div>
-                                    `}
-                                </div>
-                            </div>
-
-                            <!-- Proyectos Específicos -->
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-list-check"></i> Proyectos Específicos (Opcional)
-                                </label>
-                                <div class="d-flex gap-2 mb-2">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="releaseMapManager.selectAllProjects()">
-                                        <i class="bi bi-check-all"></i> Seleccionar Todos
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="releaseMapManager.clearAllProjects()">
-                                        <i class="bi bi-x-circle"></i> Limpiar Selección
-                                    </button>
-                                </div>
-                                <select multiple class="form-select" id="projectSelector" size="6"
-                                        style="height: 150px;" onchange="releaseMapManager.handleProjectSelection()">
-                                    ${this.filterProjects().map(p => `
-                                        <option value="${p.proyectoFs}" ${this.selectedProjects.includes(p.proyectoFs) ? 'selected' : ''}>
-                                            ${p.proyectoFs} - ${p.nombre}
-                                        </option>
-                                    `).join('')}
-                                </select>
-                                <small class="form-text text-muted">
-                                    Mantén presionado Ctrl/Cmd para seleccionar múltiples proyectos
-                                </small>
-                            </div>
-
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-success" onclick="releaseMapManager.applyFilters()">
-                                    <i class="bi bi-check-circle"></i> Aplicar Filtros
-                                </button>
-                                <button class="btn btn-secondary" onclick="releaseMapManager.resetFilters()">
-                                    <i class="bi bi-arrow-clockwise"></i> Resetear
-                                </button>
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Mapa de Liberaciones Mensual -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h5 class="mb-0"><i class="bi bi-calendar3"></i> Mapa de Liberaciones por Mes</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="release-map-grid">
-                                ${this.renderMonthlyGrid(monthlyData)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tabla Detallada -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-secondary text-white">
-                            <h5 class="mb-0"><i class="bi bi-table"></i> Detalle de Proyectos Seleccionados</h5>
-                        </div>
-                        <div class="card-body">
-                            ${this.renderDetailedTable()}
-                        </div>
+                <!-- Calendario de liberaciones -->
+                <div class="col-md-9">
+                    <div class="release-calendar">
+                        ${this.renderReleaseCalendar()}
                     </div>
                 </div>
             </div>
@@ -348,54 +280,18 @@ class ReleaseMapManager {
         document.getElementById('releaseMapPage').innerHTML = html;
     }
 
-    renderMonthlyGrid(monthlyData) {
+    renderReleaseCalendar() {
         let html = '<div class="row g-3">';
 
         for (let month = 1; month <= 12; month++) {
-            const projects = monthlyData[month];
-            const totalHours = projects.reduce((sum, p) => sum + p.hours, 0);
-            const monthName = this.months[month - 1];
-
             html += `
-                <div class="col-md-3 col-sm-6">
-                    <div class="month-card ${projects.length > 0 ? 'has-projects' : ''}">
-                        <div class="month-header">
-                            <h6 class="mb-0">${monthName} ${this.currentYear}</h6>
-                            <span class="badge bg-primary">${projects.length} items</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="month-release-card">
+                        <div class="month-release-header">
+                            <h6 class="mb-0">${this.months[month - 1]} ${this.currentYear}</h6>
                         </div>
-                        <div class="month-body">
-                            <div class="month-stats">
-                                <div class="stat-item">
-                                    <i class="bi bi-clock"></i>
-                                    <span>${totalHours.toFixed(0)} hrs</span>
-                                </div>
-                            </div>
-                            ${projects.length > 0 ? `
-                                <div class="month-projects">
-                                    ${projects.slice(0, 5).map(p => `
-                                        <div class="project-item" title="${p.name}">
-                                            <div class="project-type-badge ${this.getTypeBadgeClass(p.type)}">
-                                                ${this.getTypeIcon(p.type)}
-                                            </div>
-                                            <div class="project-info">
-                                                <div class="project-code">${p.code}</div>
-                                                <div class="project-name">${this.truncate(p.name, 30)}</div>
-                                                <div class="project-hours">${p.hours.toFixed(0)} hrs</div>
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                    ${projects.length > 5 ? `
-                                        <div class="more-projects">
-                                            <small>+ ${projects.length - 5} más</small>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            ` : `
-                                <div class="no-projects">
-                                    <i class="bi bi-inbox"></i>
-                                    <small>Sin proyectos</small>
-                                </div>
-                            `}
+                        <div class="month-release-body">
+                            ${this.renderWeeks(month)}
                         </div>
                     </div>
                 </div>
@@ -406,88 +302,119 @@ class ReleaseMapManager {
         return html;
     }
 
-    renderDetailedTable() {
-        const filtered = this.filterProjects();
-
-        if (filtered.length === 0) {
-            return `
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i>
-                    No hay proyectos seleccionados. Por favor, ajuste los filtros.
+    renderWeeks(month) {
+        let html = '';
+        for (let week = 1; week <= 4; week++) {
+            const assignedProjects = this.getAssignedProjects(month, week);
+            html += `
+                <div class="week-drop-zone" data-month="${month}" data-week="${week}">
+                    <div class="week-label">Semana ${week}</div>
+                    <div class="week-projects-container">
+                        ${assignedProjects.length === 0 ? `
+                            <div class="empty-week">
+                                <i class="bi bi-inbox"></i>
+                                <small>Arrastra aquí</small>
+                            </div>
+                        ` : assignedProjects.map(project => `
+                            <div class="assigned-project-card" data-project-code="${project.proyectoFs}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="assigned-project-code">${project.proyectoFs}</div>
+                                        <div class="assigned-project-name">${this.truncate(project.nombre, 25)}</div>
+                                    </div>
+                                    <button class="btn btn-sm btn-danger p-0" style="width: 20px; height: 20px;"
+                                            onclick="releaseMapManager.removeProjectFromRelease('${project.proyectoFs}'); releaseMapManager.render();">
+                                        <i class="bi bi-x" style="font-size: 12px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             `;
         }
-
-        let html = `
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Código</th>
-                            <th>Proyecto</th>
-                            <th>Tipo</th>
-                            <th>Líder Técnico</th>
-                            <th>Estado</th>
-                            <th>Etapa</th>
-                            <th class="text-end">Horas Total</th>
-                            <th class="text-end">% Avance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        filtered.forEach(project => {
-            let totalHours = 0;
-            for (let i = 1; i <= 12; i++) {
-                const monthKey = `mes${String(i).padStart(2, '0')}`;
-                totalHours += parseFloat(project[monthKey]) || 0;
-            }
-
-            const progress = parseFloat(project.porcentajeAvanceReal) || 0;
-
-            html += `
-                <tr>
-                    <td><code>${project.proyectoFs || '-'}</code></td>
-                    <td>${project.nombre || '-'}</td>
-                    <td>
-                        <span class="badge ${this.getTypeBadgeClass(project.tipoProyecto)}">
-                            ${project.tipoProyecto || '-'}
-                        </span>
-                    </td>
-                    <td>${project.nombreLt || '-'}</td>
-                    <td>
-                        <span class="badge ${this.getEstadoBadgeClass(project.estado)}">
-                            ${project.estado || '-'}
-                        </span>
-                    </td>
-                    <td>${project.etapa || '-'}</td>
-                    <td class="text-end">${totalHours.toFixed(0)}</td>
-                    <td class="text-end">
-                        <div class="progress" style="height: 20px;">
-                            <div class="progress-bar ${this.getProgressBarClass(progress)}"
-                                 role="progressbar"
-                                 style="width: ${progress}%"
-                                 aria-valuenow="${progress}"
-                                 aria-valuemin="0"
-                                 aria-valuemax="100">
-                                ${progress.toFixed(0)}%
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-
-        html += `
-                    </tbody>
-                </table>
-            </div>
-        `;
-
         return html;
     }
 
-    // Métodos de interacción
+    initializeDragAndDrop() {
+        // Drag start
+        document.querySelectorAll('.draggable').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.dataset.projectCode);
+                e.target.classList.add('dragging');
+            });
+
+            item.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+            });
+        });
+
+        // Drop zones
+        document.querySelectorAll('.week-drop-zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', (e) => {
+                zone.classList.remove('drag-over');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+
+                const projectCode = e.dataTransfer.getData('text/plain');
+                const month = parseInt(zone.dataset.month);
+                const week = parseInt(zone.dataset.week);
+
+                this.assignProjectToRelease(projectCode, month, week);
+                this.render();
+                showToast(`Proyecto asignado a ${this.months[month-1]}, Semana ${week}`, 'success');
+            });
+        });
+    }
+
+    autoSuggestAll() {
+        const unassigned = this.getUnassignedProjects();
+        unassigned.forEach(project => {
+            const suggestion = this.suggestRelease(project);
+            this.assignProjectToRelease(project.proyectoFs, suggestion.month, suggestion.week);
+        });
+        this.render();
+        showToast(`${unassigned.length} proyectos asignados automáticamente`, 'success');
+    }
+
+    exportToExcel() {
+        const exportData = [];
+
+        for (let month = 1; month <= 12; month++) {
+            for (let week = 1; week <= 4; week++) {
+                const projects = this.getAssignedProjects(month, week);
+                projects.forEach(project => {
+                    exportData.push({
+                        'Mes': this.months[month - 1],
+                        'Semana': week,
+                        'Código': project.proyectoFs,
+                        'Proyecto': project.nombre,
+                        'Tipo': project.tipoProyecto,
+                        'Líder Técnico': project.nombreLt,
+                        'Estado': project.estado,
+                        'Horas Estimadas': project.totalEstimacion
+                    });
+                });
+            }
+        }
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Liberaciones');
+
+        const fileName = `liberaciones_${this.currentYear}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showToast('Excel exportado correctamente', 'success');
+    }
+
     toggleType(type) {
         const index = this.selectedTypes.indexOf(type);
         if (index > -1) {
@@ -495,54 +422,7 @@ class ReleaseMapManager {
         } else {
             this.selectedTypes.push(type);
         }
-    }
-
-    toggleLeader(leader) {
-        const index = this.selectedLeaders.indexOf(leader);
-        if (index > -1) {
-            this.selectedLeaders.splice(index, 1);
-        } else {
-            this.selectedLeaders.push(leader);
-        }
-    }
-
-    selectAllLeaders() {
-        this.selectedLeaders = this.getUniqueLeaders();
-        this.applyFilters();
-    }
-
-    clearAllLeaders() {
-        this.selectedLeaders = [];
-        this.applyFilters();
-    }
-
-    selectAllProjects() {
-        const selector = document.getElementById('projectSelector');
-        this.selectedProjects = Array.from(selector.options).map(opt => opt.value);
-        this.applyFilters();
-    }
-
-    clearAllProjects() {
-        this.selectedProjects = [];
-        this.applyFilters();
-    }
-
-    handleProjectSelection() {
-        const selector = document.getElementById('projectSelector');
-        this.selectedProjects = Array.from(selector.selectedOptions).map(opt => opt.value);
-    }
-
-    applyFilters() {
         this.render();
-        showToast('Filtros aplicados correctamente', 'success');
-    }
-
-    resetFilters() {
-        this.selectedProjects = [];
-        this.selectedLeaders = [];
-        this.selectedTypes = ['Proyecto', 'Requerimiento', 'Soporte'];
-        this.render();
-        showToast('Filtros reseteados', 'info');
     }
 
     // Métodos auxiliares
@@ -556,35 +436,66 @@ class ReleaseMapManager {
     }
 
     getTypeIcon(type) {
-        const typeStr = (type || '').toLowerCase();
-        if (typeStr.includes('proyecto')) return '<i class="bi bi-folder"></i>';
-        if (typeStr.includes('requerimiento')) return '<i class="bi bi-file-text"></i>';
-        if (typeStr.includes('soporte')) return '<i class="bi bi-tools"></i>';
-        return '<i class="bi bi-question"></i>';
+        if (!type) return '<i class="bi bi-question-circle"></i>';
+
+        const typeStr = type.toString().toLowerCase().trim();
+
+        // Proyecto
+        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
+            typeStr === 'p' || typeStr === 'proy') {
+            return '<i class="bi bi-folder-fill"></i>';
+        }
+
+        // Requerimiento
+        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
+            typeStr.includes('req') || typeStr === 'r') {
+            return '<i class="bi bi-file-text-fill"></i>';
+        }
+
+        // Soporte
+        if (typeStr.includes('soporte') || typeStr.includes('support') ||
+            typeStr.includes('sop') || typeStr === 's') {
+            return '<i class="bi bi-tools"></i>';
+        }
+
+        // Ticket
+        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+            return '<i class="bi bi-ticket-detailed-fill"></i>';
+        }
+
+        // Default
+        return '<i class="bi bi-circle-fill"></i>';
     }
 
     getTypeBadgeClass(type) {
-        const typeStr = (type || '').toLowerCase();
-        if (typeStr.includes('proyecto')) return 'bg-primary';
-        if (typeStr.includes('requerimiento')) return 'bg-info';
-        if (typeStr.includes('soporte')) return 'bg-warning';
-        return 'bg-secondary';
-    }
+        if (!type) return 'type-default';
 
-    getEstadoBadgeClass(estado) {
-        const estadoStr = (estado || '').toLowerCase();
-        if (estadoStr.includes('proceso')) return 'bg-warning';
-        if (estadoStr.includes('terminado') || estadoStr.includes('cerrado')) return 'bg-success';
-        if (estadoStr.includes('pausado') || estadoStr.includes('retenido')) return 'bg-secondary';
-        if (estadoStr.includes('cancelado')) return 'bg-danger';
-        return 'bg-info';
-    }
+        const typeStr = type.toString().toLowerCase().trim();
 
-    getProgressBarClass(progress) {
-        if (progress >= 80) return 'bg-success';
-        if (progress >= 50) return 'bg-info';
-        if (progress >= 25) return 'bg-warning';
-        return 'bg-danger';
+        // Proyecto
+        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
+            typeStr === 'p' || typeStr === 'proy') {
+            return 'type-proyecto';
+        }
+
+        // Requerimiento
+        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
+            typeStr.includes('req') || typeStr === 'r') {
+            return 'type-requerimiento';
+        }
+
+        // Soporte
+        if (typeStr.includes('soporte') || typeStr.includes('support') ||
+            typeStr.includes('sop') || typeStr === 's') {
+            return 'type-soporte';
+        }
+
+        // Ticket
+        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+            return 'type-ticket';
+        }
+
+        return 'type-default';
     }
 }
 

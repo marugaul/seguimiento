@@ -345,3 +345,196 @@ body {
         font-size: 0.9rem;
     }
 }
+
+/* Release Map Drag & Drop Styles */
+.project-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    cursor: move;
+    transition: all 0.2s;
+}
+
+.project-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    transform: translateX(-3px);
+}
+
+.project-card.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}
+
+.project-type-icon {
+    width: 35px;
+    height: 35px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.type-proyecto {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.type-requerimiento {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.type-soporte {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.type-ticket {
+    background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+}
+
+.type-default {
+    background: #6c757d;
+}
+
+.project-code-sm {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #495057;
+    font-family: 'Courier New', monospace;
+}
+
+.project-name-sm {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.project-leader-sm {
+    font-size: 0.7rem;
+    color: #adb5bd;
+}
+
+.project-suggestion {
+    background: #fff3cd;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+.project-suggestion small {
+    font-size: 0.7rem;
+    color: #856404;
+}
+
+.month-release-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 100%;
+}
+
+.month-release-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.75rem 1rem;
+}
+
+.month-release-body {
+    padding: 0.5rem;
+}
+
+.week-drop-zone {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    min-height: 80px;
+    transition: all 0.2s;
+}
+
+.week-drop-zone.drag-over {
+    background: #e7f5ff;
+    border-color: #667eea;
+    border-style: solid;
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+.week-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.week-projects-container {
+    min-height: 50px;
+}
+
+.empty-week {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: #adb5bd;
+}
+
+.empty-week i {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.assigned-project-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #667eea;
+    border-radius: 4px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+}
+
+.assigned-project-card:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.assigned-project-code {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #667eea;
+    font-family: 'Courier New', monospace;
+}
+
+.assigned-project-name {
+    font-size: 0.75rem;
+    color: #495057;
+}
+
+.unassigned-projects-container {
+    padding-right: 0.5rem;
+}
+
+.unassigned-projects-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.unassigned-projects-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.unassigned-projects-container::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 3px;
+}
+
+.release-calendar {
+    padding: 1rem 0;
+}
+
