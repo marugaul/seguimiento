@@ -43,6 +43,37 @@ async function logout() {
     }
 }
 
+function clearCacheAndReload() {
+    if (confirm('Esto borrará todos los datos temporales (cache, localStorage) y recargará la página.\n\n¿Deseas continuar?')) {
+        try {
+            // Limpiar localStorage
+            localStorage.clear();
+
+            // Limpiar sessionStorage
+            sessionStorage.clear();
+
+            // Mensaje informativo
+            console.log('✅ Cache limpiado exitosamente');
+
+            // Mostrar mensaje temporal
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = 'Cache limpiado. Recargando...';
+            errorDiv.classList.remove('alert-danger');
+            errorDiv.classList.add('alert-success');
+            errorDiv.classList.remove('d-none');
+
+            // Recargar después de 1 segundo
+            setTimeout(() => {
+                // Forzar recarga desde servidor (no cache)
+                window.location.reload(true);
+            }, 1000);
+        } catch (error) {
+            console.error('Error limpiando cache:', error);
+            alert('Error al limpiar cache. Intenta recargar la página manualmente (Ctrl+Shift+R o Cmd+Shift+R)');
+        }
+    }
+}
+
 function showLogin() {
     document.getElementById('loginScreen').classList.remove('d-none');
     document.getElementById('appScreen').classList.add('d-none');
