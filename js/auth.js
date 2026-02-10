@@ -1,4 +1,4 @@
-// Gestión de Autenticación con localStorage y archivo JSON inicial
+// Gestión de Autenticación con fallback para Safari
 class AuthManager {
     constructor() {
         this.currentUser = null;
@@ -7,16 +7,96 @@ class AuthManager {
         this.auditLogKey = 'seguimiento_audit_log';
         this.initialized = false;
 
+        // Storage en memoria como fallback
+        this.memoryStorage = {
+            users: null,
+            auth: null,
+            logs: []
+        };
+
+        // Detectar si localStorage está disponible
+        this.storageAvailable = this.checkStorageAvailable();
+
+        if (!this.storageAvailable) {
+            console.warn('⚠️ localStorage no disponible - usando memoria');
+            console.warn('Nota: Los datos se perderán al cerrar la página');
+        }
+
         // Inicializar usuarios de forma síncrona
         this.initializeUsersSync();
         this.checkCurrentUser();
     }
 
+    checkStorageAvailable() {
+        try {
+            const test = '__storage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Abstracción de almacenamiento
+    setItem(key, value) {
+        if (this.storageAvailable) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.error('Error guardando en localStorage:', e);
+                // Fallback a memoria
+                if (key === this.usersKey) this.memoryStorage.users = value;
+                else if (key === this.storageKey) this.memoryStorage.auth = value;
+            }
+        } else {
+            // Usar memoria
+            if (key === this.usersKey) this.memoryStorage.users = value;
+            else if (key === this.storageKey) this.memoryStorage.auth = value;
+            else if (key === this.auditLogKey) this.memoryStorage.logs = value;
+        }
+    }
+
+    getItem(key) {
+        if (this.storageAvailable) {
+            try {
+                return localStorage.getItem(key);
+            } catch (e) {
+                console.error('Error leyendo de localStorage:', e);
+                // Fallback a memoria
+                if (key === this.usersKey) return this.memoryStorage.users;
+                else if (key === this.storageKey) return this.memoryStorage.auth;
+                else if (key === this.auditLogKey) return this.memoryStorage.logs;
+                return null;
+            }
+        } else {
+            // Usar memoria
+            if (key === this.usersKey) return this.memoryStorage.users;
+            else if (key === this.storageKey) return this.memoryStorage.auth;
+            else if (key === this.auditLogKey) return this.memoryStorage.logs;
+            return null;
+        }
+    }
+
+    removeItem(key) {
+        if (this.storageAvailable) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.error('Error eliminando de localStorage:', e);
+            }
+        }
+        // Siempre limpiar memoria también
+        if (key === this.usersKey) this.memoryStorage.users = null;
+        else if (key === this.storageKey) this.memoryStorage.auth = null;
+        else if (key === this.auditLogKey) this.memoryStorage.logs = [];
+    }
+
     initializeUsersSync() {
-        const existingUsers = localStorage.getItem(this.usersKey);
+        const existingUsers = this.getItem(this.usersKey);
 
         if (!existingUsers) {
-            console.log('No hay usuarios en localStorage. Creando usuarios por defecto...');
+            console.log('No hay usuarios. Creando usuarios por defecto...');
 
             // Crear usuarios por defecto inmediatamente (no async)
             const defaultUsers = [
@@ -58,12 +138,12 @@ class AuthManager {
                 }
             ];
 
-            localStorage.setItem(this.usersKey, JSON.stringify(defaultUsers));
+            this.setItem(this.usersKey, JSON.stringify(defaultUsers));
             console.log('✅ Usuarios por defecto creados:', defaultUsers.length);
             console.table(defaultUsers.map(u => ({ email: u.email, password: u.password, rol: u.rol })));
         } else {
             const users = JSON.parse(existingUsers);
-            console.log('✅ Usuarios cargados de localStorage:', users.length);
+            console.log('✅ Usuarios cargados:', users.length);
             console.table(users.map(u => ({ email: u.email, rol: u.rol, activo: u.activo })));
         }
 
@@ -71,7 +151,7 @@ class AuthManager {
     }
 
     checkCurrentUser() {
-        const authData = localStorage.getItem(this.storageKey);
+        const authData = this.getItem(this.storageKey);
         if (authData) {
             try {
                 this.currentUser = JSON.parse(authData);
@@ -87,6 +167,7 @@ class AuthManager {
             console.log('=== Intento de Login ===');
             console.log('Email:', email);
             console.log('Password length:', password.length);
+            console.log('Storage disponible:', this.storageAvailable ? 'localStorage' : 'memoria');
 
             const users = this.getAllUsers();
             console.log('Total usuarios en BD:', users.length);
@@ -132,7 +213,7 @@ class AuthManager {
             };
 
             this.currentUser = userSession;
-            localStorage.setItem(this.storageKey, JSON.stringify(userSession));
+            this.setItem(this.storageKey, JSON.stringify(userSession));
 
             this.logAudit({
                 tipo: 'login',
@@ -162,12 +243,12 @@ class AuthManager {
             console.error('Error en logout:', error);
         } finally {
             this.currentUser = null;
-            localStorage.removeItem(this.storageKey);
+            this.removeItem(this.storageKey);
         }
     }
 
     isAuthenticated() {
-        const authData = localStorage.getItem(this.storageKey);
+        const authData = this.getItem(this.storageKey);
         if (!authData) return false;
 
         try {
@@ -181,7 +262,7 @@ class AuthManager {
 
     getCurrentUser() {
         if (!this.currentUser) {
-            const authData = localStorage.getItem(this.storageKey);
+            const authData = this.getItem(this.storageKey);
             if (authData) {
                 try {
                     this.currentUser = JSON.parse(authData);
@@ -200,11 +281,11 @@ class AuthManager {
 
     getAllUsers() {
         try {
-            const usersData = localStorage.getItem(this.usersKey);
+            const usersData = this.getItem(this.usersKey);
             if (!usersData) {
-                console.warn('⚠️ No hay usuarios en localStorage. Reinicializando...');
+                console.warn('⚠️ No hay usuarios. Reinicializando...');
                 this.initializeUsersSync();
-                const newUsersData = localStorage.getItem(this.usersKey);
+                const newUsersData = this.getItem(this.usersKey);
                 return newUsersData ? JSON.parse(newUsersData) : [];
             }
             return JSON.parse(usersData);
@@ -248,7 +329,7 @@ class AuthManager {
             };
 
             users.push(newUser);
-            localStorage.setItem(this.usersKey, JSON.stringify(users));
+            this.setItem(this.usersKey, JSON.stringify(users));
 
             this.logAudit({
                 tipo: 'crear_usuario',
@@ -295,7 +376,7 @@ class AuthManager {
                 fechaCreacion: users[userIndex].fechaCreacion // Mantener fecha creación
             };
 
-            localStorage.setItem(this.usersKey, JSON.stringify(users));
+            this.setItem(this.usersKey, JSON.stringify(users));
 
             this.logAudit({
                 tipo: 'actualizar_usuario',
@@ -338,7 +419,7 @@ class AuthManager {
                 u.email.toLowerCase() !== email.toLowerCase()
             );
 
-            localStorage.setItem(this.usersKey, JSON.stringify(filteredUsers));
+            this.setItem(this.usersKey, JSON.stringify(filteredUsers));
 
             this.logAudit({
                 tipo: 'eliminar_usuario',
@@ -355,7 +436,8 @@ class AuthManager {
 
     logAudit(logData) {
         try {
-            const logs = this.getAuditLogs();
+            const logsStr = this.getItem(this.auditLogKey);
+            const logs = logsStr ? JSON.parse(logsStr) : [];
             const newLog = {
                 id: String(Date.now()),
                 timestamp: new Date().toISOString(),
@@ -368,7 +450,7 @@ class AuthManager {
                 logs.splice(1000);
             }
 
-            localStorage.setItem(this.auditLogKey, JSON.stringify(logs));
+            this.setItem(this.auditLogKey, JSON.stringify(logs));
         } catch (error) {
             console.error('Error guardando log de auditoría:', error);
         }
@@ -376,7 +458,7 @@ class AuthManager {
 
     async getAuditLogs(email = null) {
         try {
-            const logsData = localStorage.getItem(this.auditLogKey);
+            const logsData = this.getItem(this.auditLogKey);
             let logs = logsData ? JSON.parse(logsData) : [];
 
             if (email) {
@@ -426,7 +508,7 @@ class AuthManager {
                 return { success: false, message: 'El archivo contiene usuarios con estructura inválida' };
             }
 
-            localStorage.setItem(this.usersKey, JSON.stringify(importedUsers));
+            this.setItem(this.usersKey, JSON.stringify(importedUsers));
 
             this.logAudit({
                 tipo: 'importar_usuarios',
@@ -444,9 +526,9 @@ class AuthManager {
     // Método para limpiar y reiniciar usuarios (útil para debugging)
     resetUsers() {
         console.log('🔄 Reiniciando usuarios...');
-        localStorage.removeItem(this.usersKey);
-        localStorage.removeItem(this.storageKey);
-        localStorage.removeItem(this.auditLogKey);
+        this.removeItem(this.usersKey);
+        this.removeItem(this.storageKey);
+        this.removeItem(this.auditLogKey);
         this.initializeUsersSync();
         console.log('✅ Usuarios reiniciados. Recarga la página.');
     }
@@ -477,5 +559,12 @@ const authManager = new AuthManager();
 window.resetAuth = () => {
     authManager.resetUsers();
 };
+
+// Mostrar aviso si localStorage no está disponible
+if (!authManager.storageAvailable) {
+    console.warn('%c⚠️ AVISO: localStorage bloqueado por el navegador', 'font-size: 16px; color: orange;');
+    console.warn('%cLos datos se almacenarán solo durante esta sesión', 'font-size: 14px; color: orange;');
+    console.warn('%cPara Safari: Desactiva "Prevent Cross-Site Tracking" en Preferencias > Privacidad', 'font-size: 14px; color: orange;');
+}
 
 console.log('🔐 AuthManager inicializado. Para reiniciar usuarios, ejecuta: resetAuth()');
