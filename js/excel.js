@@ -47,18 +47,6 @@ class ExcelProcessor {
         });
     }
 
-    // Función para normalizar nombres de columnas (remover tildes y caracteres especiales)
-    normalizeColumnName(text) {
-        if (!text) return '';
-        return String(text)
-            .trim()
-            .toUpperCase()
-            .normalize('NFD')  // Descompone caracteres con tildes
-            .replace(/[\u0300-\u036f]/g, '')  // Elimina las tildes
-            .replace(/[.]/g, '')  // Elimina puntos
-            .replace(/\s+/g, ' ');  // Normaliza espacios múltiples a uno solo
-    }
-
     parseProjects(data) {
         const projects = [];
 
@@ -67,13 +55,25 @@ class ExcelProcessor {
         // PASO 1: Leer encabezados y crear mapa de columnas por NOMBRE
         const headers = data[0];
         const columnMap = {};
-        const originalHeaders = {};  // Guardar headers originales para debug
 
         headers.forEach((header, index) => {
             if (!header) return;
-            const normalized = this.normalizeColumnName(header);
+
+            // PASO 1a: Decodificar HTML entities (ej: &Oacute; → Ó, &Iacute; → Í)
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = String(header);
+            const decoded = (tempDiv.textContent || tempDiv.innerText || String(header));
+
+            // PASO 1b: Normalizar (eliminar tildes, puntos, etc.)
+            const normalized = decoded
+                .trim()
+                .toUpperCase()
+                .normalize('NFD')  // Descompone caracteres con tildes (Ó → O + ´)
+                .replace(/[\u0300-\u036f]/g, '')  // Elimina las marcas de tilde
+                .replace(/[.]/g, '')  // Elimina puntos
+                .replace(/\s+/g, ' ');  // Normaliza espacios múltiples
+
             columnMap[normalized] = index;
-            originalHeaders[normalized] = String(header).trim();
         });
 
         // DEBUG: Mostrar columnas encontradas
@@ -82,14 +82,22 @@ class ExcelProcessor {
             const emoji = name.includes('FEC') ? '📅' :
                          name.includes('MES') ? '📆' :
                          name.includes('TOTAL') ? '💰' : '📋';
-            console.log(`${emoji} [${columnMap[name]}] ${name} (original: "${originalHeaders[name]}")`);
+            console.log(`${emoji} [${columnMap[name]}] ${name}`);
         });
         console.log(`📊 Total: ${headers.length} columnas\n`);
 
         // PASO 2: Función para buscar índice de columna por nombres posibles
         const getCol = (searchTerms) => {
             for (const term of searchTerms) {
-                const normalized = this.normalizeColumnName(term);
+                // Normalizar el término de búsqueda de la misma forma que los headers
+                const normalized = String(term)
+                    .trim()
+                    .toUpperCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[.]/g, '')
+                    .replace(/\s+/g, ' ');
+
                 const idx = columnMap[normalized];
                 if (idx !== undefined) return idx;
             }
@@ -135,7 +143,16 @@ class ExcelProcessor {
                 // Totales
                 estimacion: this.getNumericValue(row[getCol(['ESTIMACIÓN', 'ESTIMACION'])]),
                 controlCambio: this.getNumericValue(row[getCol(['CONTROL CAMBIO', 'CONTROLCAMBIO', 'CC'])]),
-                totalEstimacion: this.getNumericValue(row[getCol(['TOTAL ESTIMACIÓN', 'TOTALESTIMACION', 'TOTAL ESTIMACION'])]),
+                totalEstimacion: (() => {
+                    const colIndex = getCol(['TOTAL ESTIMACIÓN', 'TOTALESTIMACION', 'TOTAL ESTIMACION']);
+                    const rawValue = row[colIndex];
+                    const numValue = this.getNumericValue(rawValue);
+                    // DEBUG: Mostrar primeros 3 valores
+                    if (i <= 3) {
+                        console.log(`🔍 Fila ${i} - TOTAL ESTIMACIÓN [${colIndex}]: raw="${rawValue}" (type: ${typeof rawValue}) | parsed=${numValue}`);
+                    }
+                    return numValue;
+                })(),
                 totalRegistrado: this.getNumericValue(row[getCol(['TOTAL REGISTRADO', 'TOTALREGISTRADO'])]),
                 totalDisponible: this.getNumericValue(row[getCol(['TOTAL DISPONIBLE', 'TOTALDISPONIBLE'])]),
 
@@ -143,8 +160,8 @@ class ExcelProcessor {
                 porcentajeAvanceHoras: this.getCellValue(row[getCol(['% AVANCE HORAS', '%AVANCEHORAS', 'AVANCE HORAS'])]),
                 porcentajeAvanceReal: this.getCellValue(row[getCol(['% AVANCE REAL', '%AVANCEREAL', 'AVANCE REAL'])]),
                 porcentajeAvanceEsperado: this.getCellValue(row[getCol(['% AVANCE ESPERADO', '%AVANCEESPERADO', 'AVANCE ESPERADO'])]),
-                desvHoras: this.getNumericValue(row[getCol(['DESV. HORAS', 'DESVHORAS', 'DESV HORAS', 'DESV HRS'])]),
-                porcentajeDesviacion: this.getCellValue(row[getCol(['% DESVIACIÓN', '%DESVIACION', '% DESVIACION', '% DESV.', '% DESV', 'PORCENTAJE DESVIACION'])]),
+                desvHoras: this.getNumericValue(row[getCol(['DESV. HORAS', 'DESVHORAS', 'DESV HORAS'])]),
+                porcentajeDesviacion: this.getCellValue(row[getCol(['% DESVIACIÓN', '%DESVIACION', '% DESVIACION'])]),
 
                 // Fechas - usar getRawStringValue para FEC. REGISTRO INICIATIVA
                 fecRegistroIniciativa: this.getRawStringValue(row[getCol(['FEC. REGISTRO INICIATIVA', 'FEC REGISTRO INICIATIVA'])]),
@@ -211,7 +228,15 @@ class ExcelProcessor {
 
     getNumericValue(cell) {
         if (cell === undefined || cell === null || cell === '') return 0;
-        const num = parseFloat(cell);
+
+        // Si es número, retornarlo directamente
+        if (typeof cell === 'number') return cell;
+
+        // Si es string, limpiar formato (eliminar comas de miles)
+        // Ej: "2,051.16" -> "2051.16"
+        let cleaned = String(cell).replace(/,/g, '');
+
+        const num = parseFloat(cleaned);
         return isNaN(num) ? 0 : num;
     }
 
