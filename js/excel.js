@@ -47,6 +47,18 @@ class ExcelProcessor {
         });
     }
 
+    // Función para normalizar nombres de columnas (remover tildes y caracteres especiales)
+    normalizeColumnName(text) {
+        if (!text) return '';
+        return String(text)
+            .trim()
+            .toUpperCase()
+            .normalize('NFD')  // Descompone caracteres con tildes
+            .replace(/[\u0300-\u036f]/g, '')  // Elimina las tildes
+            .replace(/[.]/g, '')  // Elimina puntos
+            .replace(/\s+/g, ' ');  // Normaliza espacios múltiples a uno solo
+    }
+
     parseProjects(data) {
         const projects = [];
 
@@ -55,11 +67,13 @@ class ExcelProcessor {
         // PASO 1: Leer encabezados y crear mapa de columnas por NOMBRE
         const headers = data[0];
         const columnMap = {};
+        const originalHeaders = {};  // Guardar headers originales para debug
 
         headers.forEach((header, index) => {
             if (!header) return;
-            const normalized = String(header).trim().toUpperCase();
+            const normalized = this.normalizeColumnName(header);
             columnMap[normalized] = index;
+            originalHeaders[normalized] = String(header).trim();
         });
 
         // DEBUG: Mostrar columnas encontradas
@@ -68,14 +82,15 @@ class ExcelProcessor {
             const emoji = name.includes('FEC') ? '📅' :
                          name.includes('MES') ? '📆' :
                          name.includes('TOTAL') ? '💰' : '📋';
-            console.log(`${emoji} [${columnMap[name]}] ${name}`);
+            console.log(`${emoji} [${columnMap[name]}] ${name} (original: "${originalHeaders[name]}")`);
         });
         console.log(`📊 Total: ${headers.length} columnas\n`);
 
         // PASO 2: Función para buscar índice de columna por nombres posibles
         const getCol = (searchTerms) => {
             for (const term of searchTerms) {
-                const idx = columnMap[term.toUpperCase()];
+                const normalized = this.normalizeColumnName(term);
+                const idx = columnMap[normalized];
                 if (idx !== undefined) return idx;
             }
             return null;
@@ -128,8 +143,8 @@ class ExcelProcessor {
                 porcentajeAvanceHoras: this.getCellValue(row[getCol(['% AVANCE HORAS', '%AVANCEHORAS', 'AVANCE HORAS'])]),
                 porcentajeAvanceReal: this.getCellValue(row[getCol(['% AVANCE REAL', '%AVANCEREAL', 'AVANCE REAL'])]),
                 porcentajeAvanceEsperado: this.getCellValue(row[getCol(['% AVANCE ESPERADO', '%AVANCEESPERADO', 'AVANCE ESPERADO'])]),
-                desvHoras: this.getNumericValue(row[getCol(['DESV. HORAS', 'DESVHORAS', 'DESV HORAS'])]),
-                porcentajeDesviacion: this.getCellValue(row[getCol(['% DESVIACIÓN', '%DESVIACION', '% DESVIACION'])]),
+                desvHoras: this.getNumericValue(row[getCol(['DESV. HORAS', 'DESVHORAS', 'DESV HORAS', 'DESV HRS'])]),
+                porcentajeDesviacion: this.getCellValue(row[getCol(['% DESVIACIÓN', '%DESVIACION', '% DESVIACION', '% DESV.', '% DESV', 'PORCENTAJE DESVIACION'])]),
 
                 // Fechas - usar getRawStringValue para FEC. REGISTRO INICIATIVA
                 fecRegistroIniciativa: this.getRawStringValue(row[getCol(['FEC. REGISTRO INICIATIVA', 'FEC REGISTRO INICIATIVA'])]),
