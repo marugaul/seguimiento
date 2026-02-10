@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Validación de Columnas Excel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0066cc; }
+        h2 { color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0052a3; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #0066cc;
+            color: white;
+        }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .ok { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🔍 Validación de Columnas Excel</h1>
+        <p>Esta herramienta te permite verificar que todas las columnas se estén leyendo correctamente.</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin: 10px 0;">
+        <button onclick="validateExcel()">📊 Validar Excel</button>
+        <button onclick="location.href='index.html'">🏠 Volver</button>
+    </div>
+
+    <div id="results" class="box" style="display:none;">
+        <h2>Resultados de Validación</h2>
+        <div id="summary"></div>
+        <div id="columns"></div>
+        <div id="sample"></div>
+    </div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="js/excel.js"></script>
+    <script>
+        async function validateExcel() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Por favor selecciona un archivo Excel primero');
+                return;
+            }
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('summary').innerHTML = '<p>⏳ Procesando archivo...</p>';
+
+            try {
+                const result = await excelProcessor.processFile(file);
+
+                if (!result.success) {
+                    document.getElementById('summary').innerHTML =
+                        `<p class="error">❌ Error: ${result.error}</p>`;
+                    return;
+                }
+
+                const projects = result.projects;
+
+                // Resumen
+                let summaryHtml = `
+                    <p class="ok">✅ Archivo procesado exitosamente</p>
+                    <p><strong>Total de proyectos:</strong> ${projects.length}</p>
+                `;
+
+                document.getElementById('summary').innerHTML = summaryHtml;
+
+                // Validar columnas esperadas
+                const expectedColumns = [
+                    'idLt', 'nombreLt', 'pais', 'casoFs', 'proyectoFs', 'tipo', 'esPadre',
+                    'proyPadre', 'iniciativa', 'nombre', 'tipoProyecto', 'producto', 'area',
+                    'estado', 'etapa', 'estimacion', 'controlCambio', 'totalEstimacion',
+                    'totalRegistrado', 'totalDisponible', 'porcentajeAvanceHoras',
+                    'porcentajeAvanceReal', 'porcentajeAvanceEsperado', 'desvHoras',
+                    'porcentajeDesviacion', 'comentarios'
+                ];
+
+                let columnsHtml = '<h3>Validación de Columnas</h3><table>';
+                columnsHtml += '<tr><th>Columna</th><th>Estado</th><th>Valores Únicos</th><th>Ejemplo</th></tr>';
+
+                expectedColumns.forEach(col => {
+                    const values = projects.map(p => p[col]).filter(v => v !== '' && v !== null && v !== undefined);
+                    const uniqueValues = new Set(values).size;
+                    const hasData = values.length > 0;
+                    const example = values[0] || '(vacío)';
+
+                    const status = hasData ?
+                        `<span class="ok">✅ OK (${values.length}/${projects.length})</span>` :
+                        `<span class="error">❌ VACÍO</span>`;
+
+                    columnsHtml += `
+                        <tr>
+                            <td><strong>${col}</strong></td>
+                            <td>${status}</td>
+                            <td>${uniqueValues}</td>
+                            <td>${String(example).substring(0, 50)}</td>
+                        </tr>
+                    `;
+                });
+
+                columnsHtml += '</table>';
+                document.getElementById('columns').innerHTML = columnsHtml;
+
+                // Muestra de 3 proyectos
+                let sampleHtml = '<h3>Muestra de Datos (primeros 3 proyectos)</h3>';
+
+                projects.slice(0, 3).forEach((p, idx) => {
+                    sampleHtml += `<h4>Proyecto ${idx + 1}: ${p.nombre}</h4>`;
+                    sampleHtml += '<pre>' + JSON.stringify(p, null, 2) + '</pre>';
+                });
+
+                document.getElementById('sample').innerHTML = sampleHtml;
+
+            } catch (error) {
+                document.getElementById('summary').innerHTML =
+                    `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
