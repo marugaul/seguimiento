@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Check - Seguimiento</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #0066cc; }
+        h2 { color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+        .ok { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: #0066cc; }
+        pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0052a3; }
+        .secondary { background: #6c757d; }
+        .secondary:hover { background: #5a6268; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🔍 Verificación del Sistema</h1>
+        <p>Esta página te dirá exactamente qué versión tienes y qué está fallando.</p>
+    </div>
+
+    <div class="box">
+        <h2>1. Archivos del Sistema</h2>
+        <div id="files">Verificando...</div>
+    </div>
+
+    <div class="box">
+        <h2>2. Autenticación</h2>
+        <div id="auth">Verificando...</div>
+    </div>
+
+    <div class="box">
+        <h2>3. Menú de Navegación</h2>
+        <div id="menu">Verificando...</div>
+    </div>
+
+    <div class="box">
+        <h2>4. Acciones</h2>
+        <button onclick="testLogin()">🔐 Probar Login</button>
+        <button onclick="clearAndReload()" class="secondary">🗑️ Limpiar Todo</button>
+        <button onclick="location.href='index.html'">🏠 Ir al Login</button>
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        // 1. Verificar archivos
+        const files = [
+            'js/auth.js',
+            'js/dashboard.js',
+            'js/release-map.js',
+            'js/storage.js',
+            'js/app.js'
+        ];
+
+        let filesHtml = '<ul>';
+        let allOk = true;
+
+        Promise.all(files.map(file =>
+            fetch(file).then(r => ({ file, ok: r.ok, status: r.status }))
+        )).then(results => {
+            results.forEach(r => {
+                if (r.ok) {
+                    filesHtml += `<li class="ok">✅ ${r.file} - OK</li>`;
+                } else {
+                    filesHtml += `<li class="error">❌ ${r.file} - ERROR (${r.status})</li>`;
+                    allOk = false;
+                }
+            });
+            filesHtml += '</ul>';
+
+            if (allOk) {
+                filesHtml += '<p class="ok">✅ Todos los archivos están disponibles</p>';
+            } else {
+                filesHtml += '<p class="error">❌ Algunos archivos faltan - GitHub Pages puede no haberse actualizado</p>';
+            }
+
+            document.getElementById('files').innerHTML = filesHtml;
+        });
+
+        // 2. Verificar autenticación
+        setTimeout(() => {
+            let authHtml = '';
+
+            if (typeof authManager === 'undefined') {
+                authHtml = '<p class="error">❌ AuthManager NO está cargado</p>';
+                authHtml += '<p>El archivo js/auth.js no se cargó correctamente</p>';
+            } else {
+                authHtml = '<p class="ok">✅ AuthManager está cargado</p>';
+
+                if (authManager.storageAvailable === false) {
+                    authHtml += '<p class="error">⚠️ localStorage está BLOQUEADO (Safari Tracking Prevention)</p>';
+                    authHtml += '<p class="info">💡 Solución: Safari → Preferencias → Privacidad → Desactivar "Prevent Cross-Site Tracking"</p>';
+                } else {
+                    authHtml += '<p class="ok">✅ localStorage está disponible</p>';
+                }
+
+                const users = authManager.getAllUsers();
+                authHtml += `<p>Usuarios en sistema: <strong>${users.length}</strong></p>`;
+
+                if (users.length === 0) {
+                    authHtml += '<p class="error">❌ NO hay usuarios creados</p>';
+                } else {
+                    authHtml += '<p class="ok">✅ Usuarios disponibles:</p><ul>';
+                    users.forEach(u => {
+                        authHtml += `<li>${u.email} (${u.rol})</li>`;
+                    });
+                    authHtml += '</ul>';
+                }
+            }
+
+            document.getElementById('auth').innerHTML = authHtml;
+        }, 1000);
+
+        // 3. Verificar menú
+        fetch('index.html')
+            .then(r => r.text())
+            .then(html => {
+                let menuHtml = '';
+
+                const hasReleaseMap = html.includes('Mapa de Liberaciones');
+                const hasCargarExcel = html.includes('Cargar Excel');
+                const hasGestionarAccesos = html.includes('Gestionar Accesos');
+
+                if (hasReleaseMap) {
+                    menuHtml += '<p class="ok">✅ "Mapa de Liberaciones" está en el código</p>';
+                } else {
+                    menuHtml += '<p class="error">❌ "Mapa de Liberaciones" NO está en el código</p>';
+                    menuHtml += '<p class="info">Esto significa que GitHub Pages tiene una versión vieja</p>';
+                }
+
+                if (hasCargarExcel) menuHtml += '<p class="ok">✅ "Cargar Excel" está en el código</p>';
+                if (hasGestionarAccesos) menuHtml += '<p class="ok">✅ "Gestionar Accesos" está en el código</p>';
+
+                // Verificar versión del cache
+                const match = html.match(/auth\.js\?v=(\w+)/);
+                if (match) {
+                    const version = match[1];
+                    menuHtml += `<p class="info">📦 Versión del cache: <strong>${version}</strong></p>`;
+
+                    if (version === '20250209e') {
+                        menuHtml += '<p class="ok">✅ Tienes la versión MÁS RECIENTE</p>';
+                    } else {
+                        menuHtml += '<p class="error">⚠️ Versión desactualizada (esperada: 20250209e)</p>';
+                        menuHtml += '<p class="info">💡 Usa el botón "Limpiar Todo" abajo</p>';
+                    }
+                }
+
+                document.getElementById('menu').innerHTML = menuHtml;
+            });
+
+        // Funciones de prueba
+        function testLogin() {
+            const result = document.getElementById('result');
+            result.innerHTML = '<p class="info">⏳ Probando login...</p>';
+
+            authManager.login('admin@seguimiento.com', 'Admin2024!')
+                .then(r => {
+                    if (r.success) {
+                        result.innerHTML = '<p class="ok">✅ ¡LOGIN EXITOSO!</p><p>Puedes ir a <a href="index.html">index.html</a> y hacer login</p>';
+                    } else {
+                        result.innerHTML = `<p class="error">❌ Login falló: ${r.message}</p>`;
+                    }
+                })
+                .catch(err => {
+                    result.innerHTML = `<p class="error">❌ Error: ${err.message}</p>`;
+                });
+        }
+
+        function clearAndReload() {
+            if (confirm('Esto borrará TODO (localStorage, cache) y recargará.\n\n¿Continuar?')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                location.reload(true);
+            }
+        }
+    </script>
+</body>
+</html>
