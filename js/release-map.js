@@ -5,6 +5,14 @@ class ReleaseMapManager {
         this.selectedProjects = [];
         this.selectedLeaders = [];
         this.selectedTypes = ['Proyecto', 'Requerimiento', 'Soporte'];
+        this.filters = {
+            lider: '',
+            pais: '',
+            estado: '',
+            producto: '',
+            area: '',
+            nombre: ''  // Búsqueda por nombre de proyecto
+        };
         this.currentYear = new Date().getFullYear();
         this.months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         this.releaseAssignments = {}; // Almacena asignaciones de proyectos a meses/semanas
@@ -36,6 +44,26 @@ class ReleaseMapManager {
         return leaders.sort();
     }
 
+    getUniquePaises() {
+        const paises = [...new Set(this.projects.map(p => p.pais).filter(Boolean))];
+        return paises.sort();
+    }
+
+    getUniqueEstados() {
+        const estados = [...new Set(this.projects.map(p => p.estado).filter(Boolean))];
+        return estados.sort();
+    }
+
+    getUniqueProductos() {
+        const productos = [...new Set(this.projects.map(p => p.producto).filter(Boolean))];
+        return productos.sort();
+    }
+
+    getUniqueAreas() {
+        const areas = [...new Set(this.projects.map(p => p.area).filter(Boolean))];
+        return areas.sort();
+    }
+
     getProjectsByType(type) {
         return this.projects.filter(p => {
             return projectTypeMatches(p.tipoProyecto, type);
@@ -45,12 +73,43 @@ class ReleaseMapManager {
     filterProjects() {
         let filtered = this.projects;
 
+        // Filtro por tipo (Proyecto, Requerimiento, Soporte)
         if (this.selectedTypes.length > 0 && this.selectedTypes.length < 3) {
             filtered = filtered.filter(p => {
                 return this.selectedTypes.some(type => projectTypeMatches(p.tipoProyecto, type));
             });
         }
 
+        // Filtros adicionales desde this.filters
+        if (this.filters.lider) {
+            filtered = filtered.filter(p =>
+                (p.nombreLt || '').toLowerCase().includes(this.filters.lider.toLowerCase())
+            );
+        }
+
+        if (this.filters.pais) {
+            filtered = filtered.filter(p => p.pais === this.filters.pais);
+        }
+
+        if (this.filters.estado) {
+            filtered = filtered.filter(p => p.estado === this.filters.estado);
+        }
+
+        if (this.filters.producto) {
+            filtered = filtered.filter(p => p.producto === this.filters.producto);
+        }
+
+        if (this.filters.area) {
+            filtered = filtered.filter(p => p.area === this.filters.area);
+        }
+
+        if (this.filters.nombre) {
+            filtered = filtered.filter(p =>
+                (p.nombre || '').toLowerCase().includes(this.filters.nombre.toLowerCase())
+            );
+        }
+
+        // Filtros de selección múltiple (legacy, mantener compatibilidad)
         if (this.selectedLeaders.length > 0) {
             filtered = filtered.filter(p => this.selectedLeaders.includes(p.nombreLt));
         }
@@ -227,8 +286,81 @@ class ReleaseMapManager {
                                 </div>
                             </div>
 
+                            <!-- Filtros adicionales -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-funnel"></i> Filtros</label>
+
+                                <!-- Búsqueda por nombre -->
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Buscar por nombre..."
+                                           value="${this.filters.nombre}"
+                                           onchange="releaseMapManager.setFilter('nombre', this.value)">
+                                </div>
+
+                                <!-- Líder Técnico -->
+                                <div class="mb-2">
+                                    <select class="form-select form-select-sm"
+                                            onchange="releaseMapManager.setFilter('lider', this.value)">
+                                        <option value="">Todos los líderes</option>
+                                        ${leaders.map(l => `
+                                            <option value="${l}" ${this.filters.lider === l ? 'selected' : ''}>${l}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- País -->
+                                <div class="mb-2">
+                                    <select class="form-select form-select-sm"
+                                            onchange="releaseMapManager.setFilter('pais', this.value)">
+                                        <option value="">Todos los países</option>
+                                        ${this.getUniquePaises().map(p => `
+                                            <option value="${p}" ${this.filters.pais === p ? 'selected' : ''}>${p}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- Estado -->
+                                <div class="mb-2">
+                                    <select class="form-select form-select-sm"
+                                            onchange="releaseMapManager.setFilter('estado', this.value)">
+                                        <option value="">Todos los estados</option>
+                                        ${this.getUniqueEstados().map(e => `
+                                            <option value="${e}" ${this.filters.estado === e ? 'selected' : ''}>${e}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- Producto -->
+                                <div class="mb-2">
+                                    <select class="form-select form-select-sm"
+                                            onchange="releaseMapManager.setFilter('producto', this.value)">
+                                        <option value="">Todos los productos</option>
+                                        ${this.getUniqueProductos().map(p => `
+                                            <option value="${p}" ${this.filters.producto === p ? 'selected' : ''}>${p}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- Área -->
+                                <div class="mb-2">
+                                    <select class="form-select form-select-sm"
+                                            onchange="releaseMapManager.setFilter('area', this.value)">
+                                        <option value="">Todas las áreas</option>
+                                        ${this.getUniqueAreas().map(a => `
+                                            <option value="${a}" ${this.filters.area === a ? 'selected' : ''}>${a}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- Botón para limpiar filtros -->
+                                <button class="btn btn-sm btn-outline-secondary w-100"
+                                        onclick="releaseMapManager.clearFilters()">
+                                    <i class="bi bi-x-circle"></i> Limpiar Filtros
+                                </button>
+                            </div>
+
                             <!-- Lista de proyectos sin asignar -->
-                            <div class="unassigned-projects-container" style="max-height: 600px; overflow-y: auto;">
+                            <div class="unassigned-projects-container" style="max-height: 400px; overflow-y: auto;">
                                 ${unassignedProjects.length === 0 ? `
                                     <div class="alert alert-success">
                                         <i class="bi bi-check-circle"></i>
@@ -419,6 +551,23 @@ class ReleaseMapManager {
         } else {
             this.selectedTypes.push(type);
         }
+        this.render();
+    }
+
+    setFilter(filterName, value) {
+        this.filters[filterName] = value;
+        this.render();
+    }
+
+    clearFilters() {
+        this.filters = {
+            lider: '',
+            pais: '',
+            estado: '',
+            producto: '',
+            area: '',
+            nombre: ''
+        };
         this.render();
     }
 

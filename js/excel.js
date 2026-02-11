@@ -126,19 +126,20 @@ class ExcelProcessor {
                 estado: this.getCellValue(row[getCol(['ESTADO'])]),
                 etapa: this.getCellValue(row[getCol(['ETAPA'])]),
 
-                // Meses - buscar dinámicamente (pueden no estar todos)
-                mes01: this.getNumericValue(row[getCol(['MES 01', 'MES 1', 'MES01'])]),
-                mes02: this.getNumericValue(row[getCol(['MES 02', 'MES 2', 'MES02'])]),
-                mes03: this.getNumericValue(row[getCol(['MES 03', 'MES 3', 'MES03'])]),
-                mes04: this.getNumericValue(row[getCol(['MES 04', 'MES 4', 'MES04'])]),
-                mes05: this.getNumericValue(row[getCol(['MES 05', 'MES 5', 'MES05'])]),
-                mes06: this.getNumericValue(row[getCol(['MES 06', 'MES 6', 'MES06'])]),
-                mes07: this.getNumericValue(row[getCol(['MES 07', 'MES 7', 'MES07'])]),
-                mes08: this.getNumericValue(row[getCol(['MES 08', 'MES 8', 'MES08'])]),
-                mes09: this.getNumericValue(row[getCol(['MES 09', 'MES 9', 'MES09'])]),
-                mes10: this.getNumericValue(row[getCol(['MES 10', 'MES10'])]),
-                mes11: this.getNumericValue(row[getCol(['MES 11', 'MES11'])]),
-                mes12: this.getNumericValue(row[getCol(['MES 12', 'MES12'])]),
+                // Meses - buscar dinámicamente con soporte para año (ene-26, feb-26, etc.)
+                // Intentar formato con año primero, luego formato sin año
+                mes01: this.getNumericValue(row[getCol(['ENE-26', 'ENE 26', 'ENE-25', 'ENE 25', 'MES 01', 'MES 1', 'MES01'])]),
+                mes02: this.getNumericValue(row[getCol(['FEB-26', 'FEB 26', 'FEB-25', 'FEB 25', 'MES 02', 'MES 2', 'MES02'])]),
+                mes03: this.getNumericValue(row[getCol(['MAR-26', 'MAR 26', 'MAR-25', 'MAR 25', 'MES 03', 'MES 3', 'MES03'])]),
+                mes04: this.getNumericValue(row[getCol(['ABR-26', 'ABR 26', 'ABR-25', 'ABR 25', 'MES 04', 'MES 4', 'MES04'])]),
+                mes05: this.getNumericValue(row[getCol(['MAY-26', 'MAY 26', 'MAY-25', 'MAY 25', 'MES 05', 'MES 5', 'MES05'])]),
+                mes06: this.getNumericValue(row[getCol(['JUN-26', 'JUN 26', 'JUN-25', 'JUN 25', 'MES 06', 'MES 6', 'MES06'])]),
+                mes07: this.getNumericValue(row[getCol(['JUL-26', 'JUL 26', 'JUL-25', 'JUL 25', 'MES 07', 'MES 7', 'MES07'])]),
+                mes08: this.getNumericValue(row[getCol(['AGO-26', 'AGO 26', 'AGO-25', 'AGO 25', 'MES 08', 'MES 8', 'MES08'])]),
+                mes09: this.getNumericValue(row[getCol(['SEP-26', 'SEP 26', 'SEP-25', 'SEP 25', 'MES 09', 'MES 9', 'MES09'])]),
+                mes10: this.getNumericValue(row[getCol(['OCT-26', 'OCT 26', 'OCT-25', 'OCT 25', 'MES 10', 'MES10'])]),
+                mes11: this.getNumericValue(row[getCol(['NOV-26', 'NOV 26', 'NOV-25', 'NOV 25', 'MES 11', 'MES11'])]),
+                mes12: this.getNumericValue(row[getCol(['DIC-26', 'DIC 26', 'DIC-25', 'DIC 25', 'MES 12', 'MES12'])]),
 
                 // Totales
                 estimacion: this.getNumericValue(row[getCol(['ESTIMACIÓN', 'ESTIMACION'])]),
