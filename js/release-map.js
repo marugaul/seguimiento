@@ -38,9 +38,7 @@ class ReleaseMapManager {
 
     getProjectsByType(type) {
         return this.projects.filter(p => {
-            const projectType = (p.tipoProyecto || '').toLowerCase();
-            const searchType = type.toLowerCase();
-            return projectType.includes(searchType);
+            return projectTypeMatches(p.tipoProyecto, type);
         });
     }
 
@@ -49,8 +47,7 @@ class ReleaseMapManager {
 
         if (this.selectedTypes.length > 0 && this.selectedTypes.length < 3) {
             filtered = filtered.filter(p => {
-                const projectType = (p.tipoProyecto || '').toLowerCase();
-                return this.selectedTypes.some(type => projectType.includes(type.toLowerCase()));
+                return this.selectedTypes.some(type => projectTypeMatches(p.tipoProyecto, type));
             });
         }
 
@@ -438,28 +435,19 @@ class ReleaseMapManager {
     getTypeIcon(type) {
         if (!type) return '<i class="bi bi-question-circle"></i>';
 
-        const typeStr = type.toString().toLowerCase().trim();
+        const { normalized, category } = normalizeProjectType(type);
 
-        // Proyecto
-        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
-            typeStr === 'p' || typeStr === 'proy') {
+        // Usar categoría primero para consistencia
+        if (category === 'PROYECTO') {
             return '<i class="bi bi-folder-fill"></i>';
-        }
-
-        // Requerimiento
-        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
-            typeStr.includes('req') || typeStr === 'r') {
+        } else if (category === 'REQUERIMIENTO') {
             return '<i class="bi bi-file-text-fill"></i>';
-        }
-
-        // Soporte
-        if (typeStr.includes('soporte') || typeStr.includes('support') ||
-            typeStr.includes('sop') || typeStr === 's') {
+        } else if (category === 'SOPORTE') {
             return '<i class="bi bi-tools"></i>';
         }
 
-        // Ticket
-        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+        // Fallback: verificar otros patrones en string normalizado
+        if (normalized.includes('TICKET') || normalized.includes('TCK')) {
             return '<i class="bi bi-ticket-detailed-fill"></i>';
         }
 
@@ -470,28 +458,19 @@ class ReleaseMapManager {
     getTypeBadgeClass(type) {
         if (!type) return 'type-default';
 
-        const typeStr = type.toString().toLowerCase().trim();
+        const { normalized, category } = normalizeProjectType(type);
 
-        // Proyecto
-        if (typeStr.includes('proyecto') || typeStr.includes('project') ||
-            typeStr === 'p' || typeStr === 'proy') {
+        // Usar categoría primero para consistencia
+        if (category === 'PROYECTO') {
             return 'type-proyecto';
-        }
-
-        // Requerimiento
-        if (typeStr.includes('requerimiento') || typeStr.includes('requirement') ||
-            typeStr.includes('req') || typeStr === 'r') {
+        } else if (category === 'REQUERIMIENTO') {
             return 'type-requerimiento';
-        }
-
-        // Soporte
-        if (typeStr.includes('soporte') || typeStr.includes('support') ||
-            typeStr.includes('sop') || typeStr === 's') {
+        } else if (category === 'SOPORTE') {
             return 'type-soporte';
         }
 
-        // Ticket
-        if (typeStr.includes('ticket') || typeStr.includes('tck')) {
+        // Fallback: verificar otros patrones
+        if (normalized.includes('TICKET') || normalized.includes('TCK')) {
             return 'type-ticket';
         }
 

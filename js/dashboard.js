@@ -43,34 +43,20 @@ class DashboardManager {
         console.table(debugData);
 
         this.projects.forEach(project => {
-            // Determinar categoría basándose en TIPO PROYECTO
-            // Decodificar HTML entities y normalizar
-            let tipoNormalizado = '';
-            if (project.tipoProyecto) {
-                // Decodificar HTML entities (ej: &Oacute; → Ó)
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = project.tipoProyecto;
-                tipoNormalizado = (tempDiv.textContent || tempDiv.innerText || '')
-                    .toUpperCase().trim().replace(/\s+/g, ' ');
-            }
+            // Determinar categoría usando la función compartida para consistencia
+            const { normalized, category } = normalizeProjectType(project.tipoProyecto);
+            project.categoria = category;
 
-            if (tipoNormalizado.includes('IMPLEMENTACIÓN') ||
-                tipoNormalizado.includes('IMPLEMENTACION') ||
-                tipoNormalizado.includes('PROYECTO')) {
-                project.categoria = 'PROYECTO';
+            // Asignar numero basado en categoría
+            if (category === 'PROYECTO') {
                 project.numero = project.iniciativa;
-            } else if (tipoNormalizado.includes('SOPORTE')) {
-                project.categoria = 'SOPORTE';
-                project.numero = project.casoFs;
-            } else if (tipoNormalizado.includes('REQUERIMIENTO')) {
-                project.categoria = 'REQUERIMIENTO';
+            } else if (category === 'SOPORTE' || category === 'REQUERIMIENTO') {
                 project.numero = project.casoFs;
             } else {
-                project.categoria = 'OTRO';
                 project.numero = project.casoFs || project.iniciativa;
                 // Log solo los primeros 3 OTROS para no saturar la consola
                 if (this.projects.indexOf(project) < 3) {
-                    console.warn(`⚠️ OTRO: "${project.nombreProyecto || project.nombre}" | Tipo: "${project.tipoProyecto}" | Normalizado: "${tipoNormalizado}"`);
+                    console.warn(`⚠️ OTRO: "${project.nombreProyecto || project.nombre}" | Tipo: "${project.tipoProyecto}" | Normalizado: "${normalized}"`);
                 }
             }
 

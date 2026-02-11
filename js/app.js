@@ -703,3 +703,70 @@ function showToast(message, type = 'info') {
     const bsToast = new bootstrap.Toast(toast);
     bsToast.show();
 }
+
+/**
+ * Normaliza el tipo de proyecto decodificando entidades HTML y estandarizando el formato.
+ * También determina la categoría (PROYECTO, SOPORTE, REQUERIMIENTO, OTRO).
+ *
+ * Maneja casos especiales:
+ * - Entidades HTML: IMPLEMENTACI&Oacute;N → IMPLEMENTACIÓN
+ * - Variaciones de acentos: IMPLEMENTACIÓN e IMPLEMENTACION ambas → PROYECTO
+ * - Insensible a mayúsculas/minúsculas
+ * - Normalización de espacios en blanco
+ *
+ * @param {string} tipoProyecto - Tipo de proyecto raw desde Excel
+ * @returns {object} { normalized: string, category: string }
+ */
+function normalizeProjectType(tipoProyecto) {
+    if (!tipoProyecto) return { normalized: '', category: 'OTRO' };
+
+    // Paso 1: Decodificar entidades HTML (ej. &Oacute; → Ó, &iacute; → í)
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = tipoProyecto;
+    const decoded = (tempDiv.textContent || tempDiv.innerText || '');
+
+    // Paso 2: Normalizar (mayúsculas, trim, consolidar espacios)
+    const normalized = decoded
+        .toUpperCase()
+        .trim()
+        .replace(/\s+/g, ' ');
+
+    // Paso 3: Determinar categoría con múltiples variaciones
+    let category = 'OTRO';
+
+    // Coincide con PROYECTO: maneja IMPLEMENTACIÓN, IMPLEMENTACION, PROYECTO
+    if (normalized.includes('IMPLEMENTACIÓN') ||
+        normalized.includes('IMPLEMENTACION') ||
+        normalized.includes('PROYECTO')) {
+        category = 'PROYECTO';
+    }
+    // Coincide con SOPORTE
+    else if (normalized.includes('SOPORTE')) {
+        category = 'SOPORTE';
+    }
+    // Coincide con REQUERIMIENTO
+    else if (normalized.includes('REQUERIMIENTO')) {
+        category = 'REQUERIMIENTO';
+    }
+
+    return { normalized, category };
+}
+
+/**
+ * Verifica si un tipo de proyecto coincide con un filtro.
+ * Usa comparación normalizada con decodificación de entidades HTML.
+ *
+ * @param {string} tipoProyecto - Tipo de proyecto desde Excel
+ * @param {string} filterType - Filtro a comparar (ej. "Proyecto", "Soporte")
+ * @returns {boolean} True si coincide
+ */
+function projectTypeMatches(tipoProyecto, filterType) {
+    const { normalized, category } = normalizeProjectType(tipoProyecto);
+    const filterNormalized = filterType.toUpperCase().trim();
+
+    // Verificar si la categoría coincide con el filtro
+    if (category === filterNormalized) return true;
+
+    // También verificar coincidencia directa de substring para flexibilidad
+    return normalized.includes(filterNormalized);
+}
